@@ -1,23 +1,56 @@
-const express = require('express');
-const cors = require('cors');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
 
-const authRouter = require('./routes/auth');
-const usersRouter = require('./routes/users');
+// Import routes
+import authRoutes from './routes/auth.js';
+import userRoutes from './routes/users.js';
+
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// Security middleware
+app.use(helmet());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-production-domain.com'] 
+    : ['http://localhost:3000', 'exp://localhost:8081', 'exp://192.168.0.114:8081'],
+  credentials: true
+}));
 
-app.get('/', (req, res) => res.json({ ok: true, message: 'JIBUKS backend' }));
+// Logging
+app.use(morgan('combined'));
 
-app.use('/auth', authRouter);
-app.use('/users', usersRouter);
+// Body parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// simple error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-module.exports = app;
+// Root endpoint
+app.get('/', (req, res) => res.json({ ok: true, message: 'JIBUKS backend' }));
+
+// API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ 
+    error: err.message || 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+export default app;

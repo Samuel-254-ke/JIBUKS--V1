@@ -1,7 +1,11 @@
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const { Pool } = require('pg');
+import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { Pool } from 'pg';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const sqlPath = path.join(__dirname, '..', 'db', 'init.sql');
 const sql = fs.readFileSync(sqlPath, 'utf8');

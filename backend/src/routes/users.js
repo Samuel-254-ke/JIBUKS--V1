@@ -1,12 +1,12 @@
-const express = require('express');
-const router = express.Router();
-const userController = require('../controllers/userController');
-const { verifyJWT } = require('../middleware/auth');
+import { Router } from 'express';
+const router = Router();
+import { listUsers, createUser } from '../controllers/userController.js';
+import { verifyJWT } from '../middleware/auth.js';
 
 // Protect all user routes with JWT
 router.use(verifyJWT);
 
-router.get('/', userController.listUsers);
-router.post('/', userController.createUser);
+router.get('/', listUsers);
+router.post('/', createUser);
 
-module.exports = router;
+export default router;

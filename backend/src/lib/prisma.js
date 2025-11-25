@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 /**
@@ -8,7 +8,7 @@ function getPrismaClient() {
   return prisma;
 }
 
-module.exports = {
+export {
   prisma,
   getPrismaClient,
 };

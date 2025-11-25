@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -32,8 +32,8 @@ function generateToken(user) {
     {
       id: user.id,
       email: user.email,
-      tenant_id: user.tenant_id,
-      auth0_id: user.auth0_id,
+      tenantId: user.tenantId,
+      auth0Id: user.auth0Id,
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -51,7 +51,8 @@ function generateRefreshToken(user) {
   );
 }
 
-module.exports = {
+// Export individual functions (named exports)
+export {
   verifyJWT,
   generateToken,
   generateRefreshToken,
