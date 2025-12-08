@@ -1,15 +1,12 @@
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'expo-router'
-//import { useDispatch } from 'react-redux'
 import { Ionicons } from '@expo/vector-icons'
-// import { useLoginMutation } from '../src/store/slices/authApiSlice'
-// import { setCredentials } from '../src/store/slices/authSlice'
+import { useAuth } from '@/contexts/AuthContext'
 
 const Login = () => {
   const router = useRouter()
-  // const dispatch = useDispatch()
-  // const [login, { isLoading, error }] = useLoginMutation()
+  const { login, isLoading, error, clearError } = useAuth()
   
   const [formData, setFormData] = useState({
     email: '',
@@ -17,14 +14,14 @@ const Login = () => {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
 
   // Show error alert when login fails
-  // useEffect(() => {
-  //   if (error) {
-  //     Alert.alert('Login Error', error?.data?.message || 'Login failed')
-  //   }
-  // }, [error])
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Login Error', error)
+      clearError()
+    }
+  }, [error])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -40,17 +37,14 @@ const Login = () => {
     }
 
     try {
-      // const result = await login(formData).unwrap()
+      await login(formData)
       
-      // Store credentials in Redux
-      // dispatch(setCredentials({
-      //   user: result.data.user,
-      //   token: result.data.token
-      // }))
-      
-      Alert.alert('Success', 'Login successful!')
-      // Navigate to dashboard or main app
-      // router.push('/dashboard')
+      Alert.alert('Success', 'Login successful!', [
+        {
+          text: 'OK',
+          onPress: () => router.replace('/(tabs)')
+        }
+      ])
       
     } catch (error) {
       console.error('Login error:', error)
