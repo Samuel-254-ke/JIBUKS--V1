@@ -7,11 +7,11 @@ const transporter = nodemailer.createTransport({
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: false, // true for 465, false for other ports
     auth: {
-        user: process.env.SMTP_USER || 'lexisouders64@gmail.com',
-        pass: process.env.SMTP_PASS || 'fdmw puxl ugcq fsev',
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
     },
     tls: {
-        rejectUnauthorized: false // Accept self-signed certificates
+        rejectUnauthorized: false
     }
 });
 
@@ -30,7 +30,7 @@ transporter.verify(function (error, success) {
 export async function sendInvitationEmail(toEmail, tempPassword, inviterName, familyName) {
     try {
         const info = await transporter.sendMail({
-            from: '"JIBUKS Family" <lexisouders64@gmail.com>', // sender address
+            from: `"JIBUKS Family" <${process.env.EMAIL_USER || process.env.ADMIN_EMAIL}>`,
             to: toEmail, // list of receivers
             subject: `You've been invited to join the ${familyName} family on JIBUKS`, // Subject line
             html: `
