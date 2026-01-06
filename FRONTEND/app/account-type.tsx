@@ -15,10 +15,14 @@ export default function AccountTypeScreen() {
     setSelectedType(type);
     // Navigate based on account type after a short delay to show selection
     setTimeout(() => {
-      if (type === 'family' || type === 'both') {
+      if (type === 'family') {
         router.push('/family-setup');
+      } else if (type === 'business') {
+        router.push('/business-onboarding');
       } else {
-        router.replace('/(tabs)');
+        // For 'both', maybe go to family first then business? 
+        // Or create a combined flow. For now, defaulting to family setup.
+        router.push('/family-setup');
       }
     }, 300);
   };
