@@ -19,3 +19,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+figma_mcp_config.json
+fetch_figma.js
+figma_data_new.json
+parse_figma_new.js

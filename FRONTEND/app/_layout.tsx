@@ -26,6 +26,7 @@ export default function RootLayout() {
           <Stack.Screen name="family-setup" options={{ headerShown: false }} />
           <Stack.Screen name="add-family-member" options={{ headerShown: false }} />
           <Stack.Screen name="invite-success" options={{ headerShown: false }} />
+          <Stack.Screen name="business-onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
