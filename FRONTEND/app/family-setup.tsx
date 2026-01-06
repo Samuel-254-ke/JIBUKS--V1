@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,55 +18,80 @@ interface FamilyMember {
   avatar?: string;
 }
 
+import apiService from '@/services/api';
+
 export default function FamilySetupScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const params = useLocalSearchParams();
   const [familyName, setFamilyName] = useState('');
-  
-  // Initialize with current user
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([
-    {
-      id: '1',
-      name: user?.firstName || 'You',
-      role: 'Parent',
-      access: 'Full Access',
-      email: user?.email || '',
-      status: 'Active',
-      isCurrentUser: true,
-    }
-  ]);
+  const [loading, setLoading] = useState(false);
 
-  // Check if returning from invite success and add new member
+  // Initialize with current user
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+
+  // Fetch family data on mount
   useEffect(() => {
-    if (params.name && params.contact) {
-      const newMember: FamilyMember = {
-        id: Date.now().toString(),
-        name: params.name as string,
-        role: (params.relationship as string) || 'Parent',
-        access: 'Full Access',
-        email: params.contact as string,
-        status: 'Pending invite',
-        isCurrentUser: false,
-        avatar: params.profileImage as string | undefined,
-      };
-      
-      setFamilyMembers(prev => [...prev, newMember]);
+    loadFamilyData();
+  }, [user]);
+
+  // Check if returning from invite/add member and refresh
+  useEffect(() => {
+    if (params.refresh) {
+      loadFamilyData();
     }
   }, [params]);
+
+  const loadFamilyData = async () => {
+    try {
+      const family = await apiService.getFamily();
+      console.log('🏠 Family API response:', JSON.stringify(family, null, 2));
+      if (family) {
+        setFamilyName(family.name || '');
+
+        // Map users to UI model
+        const members = family.users.map((u: any) => ({
+          id: u.id.toString(),
+          name: u.name || 'Unknown',
+          role: u.role, // e.g. OWNER, PARENT
+          access: ['OWNER', 'ADMIN', 'PARENT'].includes(u.role) ? 'Full Access' : 'Limited Access',
+          email: u.email,
+          status: 'Active',
+          isCurrentUser: u.email === user?.email,
+          avatar: u.avatarUrl
+        }));
+
+        setFamilyMembers(members);
+      }
+    } catch (error) {
+      console.error('Failed to load family:', error);
+    }
+  };
 
   const handleAddMember = () => {
     // Navigate to add family member screen
     router.push('/add-family-member');
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!familyName.trim()) {
       alert('Please enter your family name');
       return;
     }
-    // Save family data and navigate to main tabs
-    router.replace('/(tabs)');
+
+    try {
+      setLoading(true);
+      // Update family name
+      await apiService.updateFamily({ name: familyName });
+
+      // Save family data and navigate to main tabs
+      router.replace('/(tabs)');
+    } catch (error) {
+      alert('Failed to save family setup');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -108,7 +133,7 @@ export default function FamilySetupScreen() {
         <View style={styles.familySection}>
           <View style={styles.familyHeader}>
             <Text style={styles.familyTitle}>Meet the Family</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addButton}
               onPress={handleAddMember}
             >
@@ -121,7 +146,11 @@ export default function FamilySetupScreen() {
             <View key={member.id} style={styles.memberCard}>
               <View style={styles.avatarContainer}>
                 {member.avatar ? (
-                  <Image source={{ uri: member.avatar }} style={styles.avatar} />
+                  <Image
+                    source={{ uri: member.avatar }}
+                    style={styles.avatar}
+                    resizeMode="cover"
+                  />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarText}>
@@ -130,7 +159,7 @@ export default function FamilySetupScreen() {
                   </View>
                 )}
               </View>
-              
+
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>
                   {member.name}{member.isCurrentUser && '(You)'}
@@ -269,6 +298,8 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
+    overflow: 'hidden',
+    backgroundColor: '#e5e7eb',
   },
   avatarPlaceholder: {
     width: 70,

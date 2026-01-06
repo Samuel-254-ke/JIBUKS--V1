@@ -28,7 +28,7 @@ const getBaseUrl = (): string => {
     const host = isEmulator ? '10.0.2.2' : LOCAL_IP;
     return `http://${host}:${API_PORT}/api`;
   }
-  
+
   if (Platform.OS === 'ios') {
     // iOS simulator uses localhost
     // Physical device uses local network IP
@@ -36,7 +36,7 @@ const getBaseUrl = (): string => {
     const host = isSimulator ? 'localhost' : LOCAL_IP;
     return `http://${host}:${API_PORT}/api`;
   }
-  
+
   // Web uses localhost
   return `http://localhost:${API_PORT}/api`;
 };
@@ -53,6 +53,7 @@ export interface User {
   email: string;
   name: string | null;
   tenantId: number | null;
+  role?: 'OWNER' | 'ADMIN' | 'PARENT' | 'CHILD' | 'MEMBER';
   avatarUrl?: string;
   createdAt?: string;
 }
@@ -107,7 +108,7 @@ class ApiService {
 
     try {
       console.log(`📡 ${options.method || 'GET'} ${url}`);
-      
+
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -127,7 +128,7 @@ class ApiService {
       return data as T;
     } catch (error: any) {
       console.error('❌ API Error:', error);
-      
+
       if (error.error) {
         throw error as ApiError;
       }
@@ -174,7 +175,7 @@ class ApiService {
 
   async refreshToken(): Promise<{ accessToken: string }> {
     const refreshToken = await AsyncStorage.getItem('refreshToken');
-    
+
     const response = await this.request<{ accessToken: string }>('/auth/refresh-token', {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),
@@ -196,6 +197,29 @@ class ApiService {
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('refreshToken');
     }
+  }
+
+  // Family endpoints
+  async getFamily(): Promise<any> {
+    return this.request('/family');
+  }
+
+  async updateFamily(data: { name: string }): Promise<any> {
+    return this.request('/family', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addFamilyMember(data: any): Promise<any> {
+    const isFormData = data instanceof FormData;
+
+    return this.request('/family/members', {
+      method: 'POST',
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' }, // Fetch handles Content-Type for FormData
+      body: isFormData ? data : JSON.stringify(data),
+    });
   }
 }
 

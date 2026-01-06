@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-//import * as ImagePicker from 'expo-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 interface Permission {
   id: string;
@@ -11,23 +11,27 @@ interface Permission {
   enabled: boolean;
 }
 
+import apiService from '@/services/api';
+
 export default function AddFamilyMemberScreen() {
   const router = useRouter();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState('');
-  const [contact, setContact] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState(''); // Added password field
+  const [loading, setLoading] = useState(false);
   const [permissions, setPermissions] = useState<Permission[]>([
     { id: '1', label: 'View transactions', enabled: false },
     { id: '2', label: 'View budgets', enabled: false },
     { id: '3', label: 'Add transactions', enabled: false },
     { id: '4', label: 'Manage budgets', enabled: false },
-    { id: '5', label: 'Invite members', enabled: false },
+    // { id: '5', label: 'Invite members', enabled: false }, // Removed as per context
   ]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'We need camera roll permissions to select a photo');
       return;
@@ -53,32 +57,73 @@ export default function AddFamilyMemberScreen() {
     );
   };
 
-  const handleSendInvitation = () => {
+  const handleAddMember = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter the member\'s name');
       return;
     }
-    if (!relationship.trim()) {
-      Alert.alert('Error', 'Please enter the relationship');
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter email address');
       return;
     }
-    if (!contact.trim()) {
-      Alert.alert('Error', 'Please enter contact information');
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter a temporary password');
       return;
     }
 
-    // TODO: Send invitation to backend
-    // Navigate to success screen
-    router.push({
-      pathname: '/invite-success',
-      params: {
-        name,
-        relationship,
-        contact,
-        profileImage,
-        permissions: JSON.stringify(permissions.filter(p => p.enabled).map(p => p.label)),
+    // Map relationship to Role
+    let role = 'MEMBER';
+    const rel = relationship.toLowerCase();
+    if (rel.includes('parent')) role = 'PARENT';
+    else if (rel.includes('child') || rel.includes('kid')) role = 'CHILD';
+    else if (rel.includes('admin')) role = 'ADMIN';
+
+    try {
+      setLoading(true);
+
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('role', role);
+
+      // Handle image upload
+      if (profileImage) {
+        if (Platform.OS === 'web') {
+          // For web, fetch the blob
+          try {
+            const response = await fetch(profileImage);
+            const blob = await response.blob();
+            const filename = profileImage.split('/').pop() || 'profile.jpg';
+            // @ts-ignore
+            formData.append('profileImage', blob, filename);
+          } catch (err) {
+            console.error('Error processing image:', err);
+          }
+        } else {
+          // For native platforms
+          const filename = profileImage.split('/').pop() || 'profile.jpg';
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+          // @ts-ignore
+          formData.append('profileImage', { uri: profileImage, name: filename, type });
+        }
       }
-    });
+
+      console.log('Sending member data with image...');
+
+      await apiService.addFamilyMember(formData);
+
+      Alert.alert('Success', 'Family member added successfully! Check their email for login credentials.', [
+        { text: 'OK', onPress: () => router.push({ pathname: '/family-setup', params: { refresh: 'true' } }) }
+      ]);
+
+    } catch (error: any) {
+      console.error('Add member error:', error);
+      Alert.alert('Error', error.error || error.message || 'Failed to add member');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -138,17 +183,30 @@ export default function AddFamilyMemberScreen() {
           />
         </View>
 
-        {/* Contact Information Input */}
+        {/* Email Input */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Contact Information</Text>
+          <Text style={styles.label}>Email Address</Text>
           <TextInput
             style={styles.input}
-            placeholder="Email or Phone Number"
+            placeholder="member@example.com"
             placeholderTextColor="#d1d5db"
-            value={contact}
-            onChangeText={setContact}
+            value={email}
+            onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+          />
+        </View>
+
+        {/* Password Input */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Temporary Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Create a password"
+            placeholderTextColor="#d1d5db"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
           />
         </View>
 
@@ -175,10 +233,11 @@ export default function AddFamilyMemberScreen() {
         {/* Send Invitation Button */}
         <TouchableOpacity
           style={styles.sendButton}
-          onPress={handleSendInvitation}
+          onPress={handleAddMember}
           activeOpacity={0.8}
+          disabled={loading}
         >
-          <Text style={styles.sendButtonText}>Send Invitation</Text>
+          <Text style={styles.sendButtonText}>{loading ? 'Adding...' : 'Add Member'}</Text>
         </TouchableOpacity>
 
         {/* Footer */}
