@@ -35,6 +35,9 @@ export default function RootLayout() {
           <Stack.Screen name="business-onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="contact-information" options={{ headerShown: false }} />
           <Stack.Screen name="financial-setup" options={{ headerShown: false }} />
+          <Stack.Screen name="family-settings" options={{ headerShown: false }} />
+          <Stack.Screen name="edit-member-permissions" options={{ headerShown: false }} />
+          <Stack.Screen name="edit-family-profile" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
