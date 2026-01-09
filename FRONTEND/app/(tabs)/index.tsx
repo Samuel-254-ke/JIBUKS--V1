@@ -17,6 +17,33 @@ import apiService from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
+// Mock data for enhanced features
+// TODO: Replace with real API calls when backend is ready
+const enhancedMockData = {
+  balance: {
+    total: 24580,
+    accountsCount: 3
+  },
+  monthlyBudget: {
+    title: "MONTHLY BUDGET",
+    spent: 31000,
+    remaining: 71000,
+    progress: 40
+  },
+  goalProgress: {
+    name: "NEW CAR FUND",
+    current: 200000,
+    target: 500000,
+    progress: 40
+  },
+  recentActivity: [
+    { id: 1, name: "Supermarket", amount: -2400, time: "Today 3:24 PM", category: "Food", type: "expense" as const },
+    { id: 2, name: "M-pesa", amount: 21400, time: "Today 12:20 PM", category: "mpesa", type: "income" as const },
+    { id: 3, name: "Rent", amount: -12500, time: "Oct 28", category: "Housing", type: "expense" as const },
+    { id: 4, name: "Salary", amount: 50000, time: "Oct 25", category: "Income", type: "income" as const },
+  ]
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -111,13 +138,24 @@ export default function HomeScreen() {
               <Text style={styles.familyName}>Error</Text>
               <Text style={styles.headerTitle}>Family Dashboard</Text>
             </View>
-            <TouchableOpacity
-              style={styles.settingsButton}
-              // @ts-ignore - Route exists but not in type definitions
-              onPress={() => router.push('/family-settings')}
-            >
-              <Ionicons name="settings-outline" size={24} color="#fff" />
-            </TouchableOpacity>
+            <View style={styles.headerIcons}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => {
+                  // TODO: Navigate to notifications screen when implemented
+                  console.log('Notifications pressed');
+                }}
+              >
+                <Ionicons name="notifications-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconButton}
+                // @ts-ignore - Route exists but not in type definitions
+                onPress={() => router.push('/family-settings')}
+              >
+                <Ionicons name="settings-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </LinearGradient>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -154,13 +192,24 @@ export default function HomeScreen() {
             <Text style={styles.familyName}>{dashboardData.familyName}</Text>
             <Text style={styles.headerTitle}>Family Dashboard</Text>
           </View>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            // @ts-ignore - Route exists but not in type definitions
-            onPress={() => router.push('/family-settings')}
-          >
-            <Ionicons name="settings-outline" size={24} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => {
+                // TODO: Navigate to notifications screen when implemented
+                console.log('Notifications pressed');
+              }}
+            >
+              <Ionicons name="notifications-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              // @ts-ignore - Route exists but not in type definitions
+              onPress={() => router.push('/family-settings')}
+            >
+              <Ionicons name="settings-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
@@ -179,6 +228,15 @@ export default function HomeScreen() {
           <Text style={styles.familyNameText}>
             {dashboardData.familyName}
           </Text>
+        </View>
+
+        {/* Balance Card */}
+        <View style={styles.section}>
+          <View style={styles.balanceCard}>
+            <Text style={styles.balanceTitle}>BALANCE</Text>
+            <Text style={styles.balanceAmount}>{formatCurrency(enhancedMockData.balance.total)}</Text>
+            <Text style={styles.balanceSubtitle}>Across {enhancedMockData.balance.accountsCount} accounts</Text>
+          </View>
         </View>
 
         {/* Quick Stats Cards */}
@@ -222,6 +280,123 @@ export default function HomeScreen() {
               <Text style={styles.statLabel}>Month Spending</Text>
             </View>
           </View>
+        </View>
+
+        {/* Progress Cards Row */}
+        <View style={styles.section}>
+          <View style={styles.progressCardsRow}>
+            {/* Monthly Budget Progress */}
+            <View style={styles.progressCard}>
+              <Text style={styles.progressCardTitle}>{enhancedMockData.monthlyBudget.title}</Text>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${enhancedMockData.monthlyBudget.progress}%`, backgroundColor: '#f59e0b' }]} />
+              </View>
+              <View style={styles.progressCardDetails}>
+                <Text style={styles.progressCardText}>Spent: {formatCurrency(enhancedMockData.monthlyBudget.spent)}</Text>
+                <Text style={styles.progressCardText}>Left: {formatCurrency(enhancedMockData.monthlyBudget.remaining)}</Text>
+              </View>
+            </View>
+
+            {/* Goal Progress */}
+            <View style={styles.progressCard}>
+              <Text style={styles.progressCardTitle}>{enhancedMockData.goalProgress.name}</Text>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${enhancedMockData.goalProgress.progress}%`, backgroundColor: '#2563eb' }]} />
+              </View>
+              <Text style={styles.progressCardAmount}>
+                {formatCurrency(enhancedMockData.goalProgress.current)} / {formatCurrency(enhancedMockData.goalProgress.target)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.section}>
+          <View style={styles.actionButtonsRow}>
+            <TouchableOpacity 
+              style={styles.actionButtonSquare}
+              onPress={() => {
+                try {
+                  (router.push as any)('/income');
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                }
+              }}
+            >
+              <View style={styles.actionIconCircle}>
+                <Text style={styles.actionIconEmoji}>🎁</Text>
+              </View>
+              <Text style={styles.actionButtonLabel}>Income</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionButtonSquare}
+              onPress={() => {
+                try {
+                  (router.push as any)('/expenses');
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                }
+              }}
+            >
+              <View style={styles.actionIconCircle}>
+                <Text style={styles.actionIconEmoji}>💰</Text>
+              </View>
+              <Text style={styles.actionButtonLabel}>Expense</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionButtonSquare}
+              onPress={() => {
+                try {
+                  (router.push as any)('/manage');
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                }
+              }}
+            >
+              <View style={styles.actionIconCircle}>
+                <Ionicons name="settings" size={24} color="#fff" />
+              </View>
+              <Text style={styles.actionButtonLabel}>Manage</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Recent Family Activity */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>RECENT FAMILY ACTIVITY</Text>
+          <View style={styles.activityCard}>
+            {enhancedMockData.recentActivity.map((activity) => (
+              <View key={activity.id} style={styles.activityItem}>
+                <View style={styles.activityLeft}>
+                  <View style={[
+                    styles.activityIconCircle,
+                    { backgroundColor: activity.type === 'income' ? '#d1fae5' : '#fee2e2' }
+                  ]}>
+                    <Ionicons 
+                      name={activity.type === 'income' ? 'arrow-down' : 'arrow-up'} 
+                      size={20} 
+                      color={activity.type === 'income' ? '#10b981' : '#ef4444'} 
+                    />
+                  </View>
+                  <View style={styles.activityDetails}>
+                    <Text style={styles.activityName}>{activity.name}</Text>
+                    <Text style={styles.activityTime}>{activity.time} | {activity.category}</Text>
+                  </View>
+                </View>
+                <Text style={[
+                  styles.activityAmount,
+                  { color: activity.type === 'income' ? '#10b981' : '#ef4444' }
+                ]}>
+                  {activity.type === 'income' ? '+' : ''}{formatCurrency(activity.amount)}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity style={styles.viewAllButton}>
+            <Text style={styles.viewAllButtonText}>View all Activity</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Recent Goals Section */}
@@ -334,9 +509,9 @@ export default function HomeScreen() {
           })}
         </View>
 
-        {/* Quick Action Buttons */}
+        {/* Additional Quick Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionTitle}>More Actions</Text>
 
           <TouchableOpacity
             style={styles.actionButton}
@@ -404,6 +579,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settingsButton: {
     width: 40,
@@ -620,5 +808,168 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // New styles for enhanced dashboard
+  balanceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  balanceTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  balanceAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#f59e0b',
+    marginBottom: 8,
+  },
+  balanceSubtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+  },
+  progressCardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    width: (width - 56) / 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  progressCardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  progressCardDetails: {
+    marginTop: 8,
+  },
+  progressCardText: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  progressCardAmount: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 8,
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionButtonSquare: {
+    backgroundColor: '#2563eb',
+    borderRadius: 16,
+    padding: 16,
+    width: (width - 64) / 3,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionIconEmoji: {
+    fontSize: 24,
+  },
+  actionButtonLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activityCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  activityLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  activityIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activityDetails: {
+    flex: 1,
+  },
+  activityName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  activityTime: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  activityAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  viewAllButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  viewAllButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
