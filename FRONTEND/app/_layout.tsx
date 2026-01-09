@@ -53,6 +53,11 @@ export default function RootLayout() {
           <Stack.Screen name="family-settings" options={{ headerShown: false }} />
           <Stack.Screen name="edit-member-permissions" options={{ headerShown: false }} />
           <Stack.Screen name="edit-family-profile" options={{ headerShown: false }} />
+          <Stack.Screen name="manage" options={{ headerShown: false }} />
+          <Stack.Screen name="income" options={{ headerShown: false }} />
+          <Stack.Screen name="add-income" options={{ headerShown: false }} />
+          <Stack.Screen name="expenses" options={{ headerShown: false }} />
+          <Stack.Screen name="add-expense" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
