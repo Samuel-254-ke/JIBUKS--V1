@@ -8,8 +8,12 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
   return Constants.expoConfig?.extra?.[key] || process.env[key] || defaultValue;
 };
 
-const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '192.168.1.66');
-const API_PORT = getEnvVar('EXPO_PUBLIC_API_PORT', '4400');
+<<<<<<< Updated upstream
+const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '192.168.1.68');
+=======
+const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', );
+>>>>>>> Stashed changes
+const API_PORT = getEnvVar('EXPO_PUBLIC_API_PORT', '4001');
 
 // Build API base URL based on platform
 const getBaseUrl = (): string => {
@@ -43,9 +47,9 @@ const getBaseUrl = (): string => {
 
 const API_BASE_URL = getBaseUrl();
 
-console.log('API Base URL:', API_BASE_URL);
-console.log('Platform:', Platform.OS);
-console.log('Device:', Constants.isDevice ? 'Physical' : 'Simulator/Emulator');
+console.log('🌐 API Base URL:', API_BASE_URL);
+console.log('📱 Platform:', Platform.OS);
+console.log('🔧 Device:', Constants.isDevice ? 'Physical' : 'Simulator/Emulator');
 
 // TypeScript interfaces
 export interface User {
@@ -243,40 +247,40 @@ class ApiService {
       body: isFormData ? data : JSON.stringify(data),
     });
   }
-  // Family Settings
-  async getFamilySettings(): Promise<any> {
-    return this.request('/family/settings');
-  }
 
-
-
-  // Budget endpoints
-  async getBudgets(): Promise<any> {
-    return this.request('/budgets');
-  }
-
-  async getBudget(id: number): Promise<any> {
-    return this.request(`/budgets/${id}`);
-  }
-
-  async createBudget(data: { category: string; amount: number; period?: string }): Promise<any> {
-    return this.request('/budgets', {
+  async createGoal(data: any): Promise<any> {
+    return this.request('/family/goals', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateBudget(id: number, data: any): Promise<any> {
-    return this.request(`/budgets/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
+  async getGoals(): Promise<any> {
+    return this.request('/family/goals');
+  }
+
+  async saveBudgets(budgets: { category: string; amount: string }[]): Promise<any> {
+    return this.request('/family/budgets', {
+      method: 'POST',
+      body: JSON.stringify({ budgets }),
     });
   }
 
-  async deleteBudget(id: number): Promise<any> {
-    return this.request(`/budgets/${id}`, {
-      method: 'DELETE',
-    });
+  async getBudgets(): Promise<any> {
+    return this.request('/family/budgets');
+  }
+
+  // Family Settings APIs
+  async getFamilySettings(): Promise<any> {
+    return this.request('/family/settings');
+  }
+
+  async getDashboardStats(): Promise<any> {
+    return this.request('/family/dashboard');
+  }
+
+  async getMemberDetails(memberId: string): Promise<any> {
+    return this.request(`/family/members/${memberId}`);
   }
 
   async updateMemberPermissions(memberId: string, permissions: any): Promise<any> {
@@ -330,176 +334,6 @@ class ApiService {
     return this.request('/family/profile', {
       method: 'PUT',
       body: formData,
-    });
-  }
-
-  // Transaction endpoints
-  async getTransactions(params?: {
-    type?: 'INCOME' | 'EXPENSE';
-    startDate?: string;
-    endDate?: string;
-    category?: string;
-    limit?: number;
-  }): Promise<any> {
-    const queryParams = new URLSearchParams();
-    if (params?.type) queryParams.append('type', params.type);
-    if (params?.startDate) queryParams.append('startDate', params.startDate);
-    if (params?.endDate) queryParams.append('endDate', params.endDate);
-    if (params?.category) queryParams.append('category', params.category);
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-
-    const query = queryParams.toString();
-    return this.request(`/transactions${query ? `?${query}` : ''}`);
-  }
-
-  async getTransactionStats(params?: { startDate?: string; endDate?: string }): Promise<any> {
-    const queryParams = new URLSearchParams();
-    if (params?.startDate) queryParams.append('startDate', params.startDate);
-    if (params?.endDate) queryParams.append('endDate', params.endDate);
-
-    const query = queryParams.toString();
-    return this.request(`/transactions/stats${query ? `?${query}` : ''}`);
-  }
-
-  async createTransaction(data: {
-    type: 'INCOME' | 'EXPENSE';
-    amount: number;
-    category: string;
-    description?: string;
-    date?: string;
-    paymentMethod?: string;
-    notes?: string;
-  }): Promise<any> {
-    return this.request('/transactions', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateTransaction(id: number, data: any): Promise<any> {
-    return this.request(`/transactions/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteTransaction(id: number): Promise<any> {
-    return this.request(`/transactions/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Category endpoints
-  async getCategories(type?: 'income' | 'expense'): Promise<any> {
-    const query = type ? `?type=${type}` : '';
-    return this.request(`/categories${query}`);
-  }
-
-  async createCategory(data: {
-    name: string;
-    type: 'income' | 'expense';
-    icon?: string;
-    color?: string;
-  }): Promise<any> {
-    return this.request('/categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCategory(id: number, data: any): Promise<any> {
-    return this.request(`/categories/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteCategory(id: number): Promise<any> {
-    return this.request(`/categories/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Payment Method endpoints
-  async getPaymentMethods(): Promise<any> {
-    return this.request('/payment-methods');
-  }
-
-  async createPaymentMethod(data: {
-    name: string;
-    type: string;
-    details?: any;
-  }): Promise<any> {
-    return this.request('/payment-methods', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updatePaymentMethod(id: number, data: any): Promise<any> {
-    return this.request(`/payment-methods/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deletePaymentMethod(id: number): Promise<any> {
-    return this.request(`/payment-methods/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Dashboard endpoints
-  async getDashboard(): Promise<any> {
-    return this.request('/dashboard');
-  }
-
-  async getAnalytics(period?: 'week' | 'month' | 'year'): Promise<any> {
-    const query = period ? `?period=${period}` : '';
-    return this.request(`/dashboard/analytics${query}`);
-  }
-
-  // Goals endpoints
-  async getGoals(): Promise<any> {
-    return this.request('/goals');
-  }
-
-  async getGoal(id: number): Promise<any> {
-    return this.request(`/goals/${id}`);
-  }
-
-  async createGoal(data: {
-    name: string;
-    description?: string;
-    targetAmount: number;
-    currentAmount?: number;
-    targetDate?: string;
-    monthlyContribution?: number;
-    assignedUserId?: number;
-  }): Promise<any> {
-    return this.request('/goals', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async contributeToGoal(goalId: number, amount: number, description?: string): Promise<any> {
-    return this.request(`/goals/${goalId}/contribute`, {
-      method: 'POST',
-      body: JSON.stringify({ amount, description }),
-    });
-  }
-
-  async updateGoal(id: number, data: any): Promise<any> {
-    return this.request(`/goals/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteGoal(id: number): Promise<any> {
-    return this.request(`/goals/${id}`, {
-      method: 'DELETE',
     });
   }
 
