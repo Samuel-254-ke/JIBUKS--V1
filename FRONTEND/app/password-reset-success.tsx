@@ -1,107 +1,73 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native'
+import React from 'react'
+import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 
-export default function PasswordResetSuccessScreen() {
-  const router = useRouter();
+const PasswordResetSuccess = () => {
+  const router = useRouter()
 
-  const handleContinueToLogin = () => {
-    // Navigate to login screen, replace so user can't go back
-    router.replace('/login');
-  };
+  const handleLogin = () => {
+    router.replace('/login')
+  }
 
   return (
     <View style={styles.container}>
-      {/* Logo */}
-      <View style={styles.logoSection}>
-        <Image
-          source={require('../assets/images/homepage.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Success Icon and Text */}
-      <View style={styles.contentSection}>
+      <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name="checkmark-circle" size={80} color="#2563eb" />
+          <Ionicons name="checkmark-circle" size={80} color="#2E4BC7" />
         </View>
+        <Text style={styles.title}>Password Changed!</Text>
+        <Text style={styles.subtitle}>Your password has been changed successfully.</Text>
 
-        <Text style={styles.title}>Password Reset Successful!</Text>
-        
-        <Text style={styles.message}>
-          Your password has been updated successfully.
-        </Text>
-      </View>
-
-      {/* Continue Button */}
-      <View style={styles.buttonSection}>
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={handleContinueToLogin}
-        >
-          <Text style={styles.continueButtonText}>CONTINUE TO LOGIN</Text>
+        <TouchableOpacity style={styles.button} onPress={handleLogin}>
+          <Text style={styles.buttonText}>Back to Login</Text>
         </TouchableOpacity>
       </View>
     </View>
-  );
+  )
 }
+
+export default PasswordResetSuccess
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginTop: 80,
-    marginBottom: 60,
-  },
-  logo: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#1e3a8a',
-    borderRadius: 20,
-  },
-  contentSection: {
-    flex: 1,
-    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  content: {
+    width: '100%',
+    alignItems: 'center',
   },
   iconContainer: {
     marginBottom: 30,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: 'bold',
     color: '#000',
-    marginBottom: 20,
+    marginBottom: 10,
     textAlign: 'center',
   },
-  message: {
+  subtitle: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    marginBottom: 40,
   },
-  buttonSection: {
-    paddingBottom: 50,
-  },
-  continueButton: {
-    backgroundColor: 'transparent',
+  button: {
+    backgroundColor: '#F5B942',
     paddingVertical: 16,
+    paddingHorizontal: 40,
     borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#1e3a8a',
+    width: '100%',
     alignItems: 'center',
   },
-  continueButtonText: {
-    color: '#1e3a8a',
-    fontSize: 16,
+  buttonText: {
+    color: '#2E4BC7',
+    fontSize: 18,
     fontWeight: '600',
-    letterSpacing: 1,
   },
-});
+})

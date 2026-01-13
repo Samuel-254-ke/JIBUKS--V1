@@ -1,6 +1,6 @@
 import { Router } from 'express';
 const router = Router();
-import { login, register, refreshToken, logout, getCurrentUser } from '../controllers/authController.js';
+import { login, register, refreshToken, logout, getCurrentUser, forgotPassword, verifyOtp, resetPassword } from '../controllers/authController.js';
 import { verifyJWT } from '../middleware/auth.js';
 
 // Public routes
@@ -8,6 +8,9 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/refresh-token', refreshToken);
 router.post('/logout', logout);
+router.post('/forgot-password', forgotPassword);
+router.post('/verify-otp', verifyOtp);
+router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.get('/me', verifyJWT, getCurrentUser);

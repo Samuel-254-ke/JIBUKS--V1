@@ -225,6 +225,27 @@ class ApiService {
     }
   }
 
+  async forgotPassword(email: string): Promise<any> {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async verifyOtp(email: string, otp: string): Promise<any> {
+    return this.request('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<any> {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, newPassword }),
+    });
+  }
+
   // Family endpoints
   async getFamily(): Promise<any> {
     return this.request('/family');

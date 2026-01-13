@@ -44,6 +44,9 @@ model User {
   recurringTransactions RecurringTransaction[]
   tenant                Tenant?                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  resetPasswordOtp      String?                @map("reset_password_otp")
+  resetPasswordExpires  DateTime?              @map("reset_password_expires")
+
   @@index([tenantId])
   @@index([auth0Id])
   @@map("users")

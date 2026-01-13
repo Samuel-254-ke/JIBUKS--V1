@@ -1,180 +1,127 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-// import { showToast } from '@/utils/toast';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native'
+import React, { useState } from 'react'
+import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
+import apiService from '@/services/api'
+import { showToast } from '@/utils/toast'
 
-export default function ForgotPasswordScreen() {
-  const router = useRouter();
-  const [emailOrPhone, setEmailOrPhone] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+const ForgotPassword = () => {
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSendOTP = async () => {
-    // Validation
-    if (!emailOrPhone.trim()) {
-      Alert.alert('Error', 'Please enter your email or phone number');
-      // showToast.error('Error', 'Please enter your email or phone number');
-      return;
+  const handleSendOtp = async () => {
+    if (!email) {
+      showToast.error('Error', 'Please enter your email')
+      return
     }
 
-    setIsLoading(true);
-
+    setIsLoading(true)
     try {
-      // TODO: API call to send OTP
-      // Example API call:
-      // const response = await fetch('YOUR_API_ENDPOINT/forgot-password', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ emailOrPhone }),
-      // });
-      // const data = await response.json();
-      
-      // Simulate API call (remove this in production)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // On success, navigate to verify-otp screen
-      Alert.alert('Success', 'OTP has been sent to your email/phone');
-      // showToast.success('Success', 'OTP has been sent to your email/phone');
-      
-      // Navigate to verify-otp screen
-      router.push({
-        pathname: '/verify-otp',
-        params: { emailOrPhone }
-      });
-      
-    } catch (error) {
-      console.error('Error sending OTP:', error);
-      Alert.alert('Error', 'Failed to send OTP. Please try again.');
-      // showToast.error('Error', 'Failed to send OTP. Please try again.');
+      await apiService.forgotPassword(email)
+      showToast.success('Success', 'OTP sent to your email')
+      router.push({ pathname: '/verify-otp', params: { email } } as any)
+    } catch (error: any) {
+      console.error('Forgot password error:', error)
+      showToast.error('Error', error.response?.data?.error || error.message || 'Failed to send OTP')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer} 
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Logo Section */}
-        <View style={styles.logoSection}>
-          <Image
-            source={require('../assets/images/homepage.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
 
-        {/* Header with Lock Icon */}
-        <View style={styles.headerSection}>
-          <View style={styles.lockIconContainer}>
-            <Ionicons name="lock-closed" size={40} color="#333" />
+        <View style={styles.logoSection}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="lock-closed-outline" size={40} color="#2E4BC7" />
           </View>
           <Text style={styles.title}>Forgot Password?</Text>
+          <Text style={styles.subtitle}>Enter your email address and we'll send you a code to reset your password.</Text>
         </View>
 
-        {/* Description */}
-        <Text style={styles.description}>
-          Enter your email or phone number to reset your password
-        </Text>
-
-        {/* Form Section */}
         <View style={styles.formSection}>
-          {/* Email/Phone Input */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email /Phone :</Text>
+            <Text style={styles.label}>Email Address :</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter phone or email"
+              placeholder="Enter your email"
               placeholderTextColor="#999"
-              value={emailOrPhone}
-              onChangeText={setEmailOrPhone}
-              keyboardType="default"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
               autoCapitalize="none"
               editable={!isLoading}
             />
           </View>
 
-          {/* Send Reset OTP Button */}
           <TouchableOpacity
-            style={[styles.sendOtpButton, isLoading && styles.buttonDisabled]}
-            onPress={handleSendOTP}
+            style={[styles.button, isLoading && styles.buttonDisabled]}
+            onPress={handleSendOtp}
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#2563eb" size="small" />
+              <ActivityIndicator color="#2E4BC7" size="small" />
             ) : (
-              <Text style={styles.sendOtpButtonText}>SEND RESET OTP</Text>
+              <Text style={styles.buttonText}>Send Code</Text>
             )}
           </TouchableOpacity>
         </View>
-
-        {/* Spacer to push back button to bottom */}
-        <View style={styles.spacer} />
-
-        {/* Back to Login Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          disabled={isLoading}
-        >
-          <Text style={styles.backButtonText}>Back to login</Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
+  )
 }
+
+export default ForgotPassword
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
   },
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 30,
+  },
+  backButton: {
+    marginBottom: 20,
   },
   logoSection: {
     alignItems: 'center',
     marginBottom: 40,
   },
-  logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-  },
-  headerSection: {
+  iconContainer: {
+    width: 80,
+    height: 80,
+    backgroundColor: 'rgba(46, 75, 199, 0.1)',
+    borderRadius: 40,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
-  },
-  lockIconContainer: {
-    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#000',
+    marginBottom: 10,
     textAlign: 'center',
   },
-  description: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 20,
-    lineHeight: 20,
+    lineHeight: 24,
   },
   formSection: {
-    marginBottom: 20,
+    width: '100%',
   },
   inputGroup: {
     marginBottom: 30,
@@ -182,12 +129,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#000',
+    color: '#333',
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#000',
+    borderWidth: 2,
+    borderColor: '#333',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -195,36 +142,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     color: '#333',
   },
-  sendOtpButton: {
-    backgroundColor: '#fff',
+  button: {
+    backgroundColor: '#F5B942',
     paddingVertical: 16,
     borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#2563eb',
     alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  sendOtpButtonText: {
-    color: '#2563eb',
-    fontSize: 16,
+  buttonText: {
+    color: '#2E4BC7',
+    fontSize: 18,
     fontWeight: '600',
   },
-  spacer: {
-    flex: 1,
-    minHeight: 40,
-  },
-  backButton: {
-    backgroundColor: '#F5B942',
-    paddingVertical: 16,
-    borderRadius: 30,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  backButtonText: {
-    color: '#2563eb',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+})
