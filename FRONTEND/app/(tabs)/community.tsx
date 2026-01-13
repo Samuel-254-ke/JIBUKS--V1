@@ -185,7 +185,7 @@ export default function CommunityScreen() {
         </View>
 
         {/* Bottom Spacing for Tab Bar */}
-        <View style={{ height: 20 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );

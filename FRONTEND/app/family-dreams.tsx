@@ -74,20 +74,18 @@ export default function FamilyDreamsScreen() {
         targetAmount: parseFloat(targetAmount),
         targetDate: targetDate,
         monthlyContribution: parseFloat(monthlyContribution),
-        assignedUserId: selectedMember
+        assignedUserId: selectedMember || undefined
       });
 
-      alert('Goal created successfully!');
-
-      // Reset form and reload goals
+      // Reset form
       setGoalName('');
       setTargetAmount('');
       setTargetDate('');
       setMonthlyContribution('');
       setSelectedMember(null);
 
-      await loadGoals();
-      setViewMode('list');
+      // Navigate to success screen
+      router.push('/goal-success');
     } catch (error) {
       console.error(error);
       alert('Failed to create goal');

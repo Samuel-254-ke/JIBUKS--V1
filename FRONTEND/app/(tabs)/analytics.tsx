@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,41 +6,81 @@ import {
   ScrollView,
   Dimensions,
   SafeAreaView,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import apiService from '@/services/api';
+import { useFocusEffect } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
-// Mock analytics data
-// TODO: Replace with real API calls when backend is ready
-const mockAnalytics = {
-  spendingByCategory: [
-    { category: "Food", amount: 15000, percentage: 30, color: '#ef4444' },
-    { category: "Transport", amount: 8000, percentage: 16, color: '#f59e0b' },
-    { category: "Utilities", amount: 6000, percentage: 12, color: '#10b981' },
-    { category: "Housing", amount: 12500, percentage: 25, color: '#3b82f6' },
-    { category: "Entertainment", amount: 5500, percentage: 11, color: '#8b5cf6' },
-    { category: "Others", amount: 3000, percentage: 6, color: '#6b7280' },
-  ],
-  monthlyComparison: {
-    thisMonth: { income: 45000, expenses: 31000 },
-    lastMonth: { income: 42000, expenses: 35000 }
-  },
-  summary: {
-    totalIncome: 45000,
-    totalExpenses: 31000,
-    netSavings: 14000,
-    savingsRate: 31
-  }
-};
-
 export default function AnalyticsScreen() {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+
+  const loadAnalytics = async () => {
+    try {
+      const data = await apiService.getAnalytics('month');
+      setAnalyticsData(data);
+    } catch (error) {
+      console.error('Error loading analytics:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAnalytics();
+  }, []);
+
+  // Reload when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadAnalytics();
+    }, [])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadAnalytics();
+    setRefreshing(false);
+  };
+
   const formatCurrency = (amount: number) => {
     return `KES ${amount.toLocaleString()}`;
   };
 
-  const maxAmount = Math.max(...mockAnalytics.spendingByCategory.map(c => c.amount));
+  if (loading && !analyticsData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={['#1e3a8a', '#2563eb']} style={styles.header}>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Analytics</Text>
+          </View>
+        </LinearGradient>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>Analyzing financial data...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Use real data or fallback to zeros if something is missing
+  const summary = analyticsData?.summary || { totalIncome: 0, totalExpenses: 0, netSavings: 0, savingsRate: 0 };
+  const spendingByCategory = analyticsData?.spendingByCategory || [];
+  const monthlyComparison = analyticsData?.monthlyComparison || {
+    thisMonth: { income: 0, expenses: 0 },
+    lastMonth: { income: 0, expenses: 0 }
+  };
+
+  const maxAmount = spendingByCategory.length > 0
+    ? Math.max(...spendingByCategory.map((c: any) => c.amount))
+    : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -58,19 +98,20 @@ export default function AnalyticsScreen() {
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Summary Cards */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, { backgroundColor: '#10b981' }]}>
               <Ionicons name="arrow-down" size={24} color="#fff" />
-              <Text style={styles.summaryAmount}>{formatCurrency(mockAnalytics.summary.totalIncome)}</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(summary.totalIncome)}</Text>
               <Text style={styles.summaryLabel}>Total Income</Text>
             </View>
 
             <View style={[styles.summaryCard, { backgroundColor: '#ef4444' }]}>
               <Ionicons name="arrow-up" size={24} color="#fff" />
-              <Text style={styles.summaryAmount}>{formatCurrency(mockAnalytics.summary.totalExpenses)}</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(summary.totalExpenses)}</Text>
               <Text style={styles.summaryLabel}>Total Expenses</Text>
             </View>
           </View>
@@ -78,13 +119,13 @@ export default function AnalyticsScreen() {
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, { backgroundColor: '#2563eb' }]}>
               <Ionicons name="wallet" size={24} color="#fff" />
-              <Text style={styles.summaryAmount}>{formatCurrency(mockAnalytics.summary.netSavings)}</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(summary.netSavings)}</Text>
               <Text style={styles.summaryLabel}>Net Savings</Text>
             </View>
 
             <View style={[styles.summaryCard, { backgroundColor: '#f59e0b' }]}>
               <Ionicons name="trending-up" size={24} color="#fff" />
-              <Text style={styles.summaryAmount}>{mockAnalytics.summary.savingsRate}%</Text>
+              <Text style={styles.summaryAmount}>{summary.savingsRate}%</Text>
               <Text style={styles.summaryLabel}>Savings Rate</Text>
             </View>
           </View>
@@ -97,45 +138,54 @@ export default function AnalyticsScreen() {
             <Text style={styles.sectionSubtitle}>This Month</Text>
           </View>
 
-          <View style={styles.categoryCard}>
-            {mockAnalytics.spendingByCategory.map((category, index) => (
-              <View key={index} style={styles.categoryItem}>
-                <View style={styles.categoryLeft}>
-                  <View style={[styles.categoryDot, { backgroundColor: category.color }]} />
-                  <Text style={styles.categoryName}>{category.category}</Text>
+          {spendingByCategory.length > 0 ? (
+            <View style={styles.categoryCard}>
+              {spendingByCategory.map((category: any, index: number) => (
+                <View key={index} style={styles.categoryItem}>
+                  <View style={styles.categoryLeft}>
+                    <View style={[styles.categoryDot, { backgroundColor: category.color }]} />
+                    <Text style={styles.categoryName}>{category.category}</Text>
+                  </View>
+                  <View style={styles.categoryRight}>
+                    <Text style={styles.categoryAmount}>{formatCurrency(category.amount)}</Text>
+                    <Text style={styles.categoryPercentage}>{category.percentage}%</Text>
+                  </View>
                 </View>
-                <View style={styles.categoryRight}>
-                  <Text style={styles.categoryAmount}>{formatCurrency(category.amount)}</Text>
-                  <Text style={styles.categoryPercentage}>{category.percentage}%</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyStateCard}>
+              <Ionicons name="pie-chart-outline" size={48} color="#cbd5e1" />
+              <Text style={styles.emptyStateText}>No expense data for this month</Text>
+            </View>
+          )}
         </View>
 
         {/* Category Bar Chart */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Spending Breakdown</Text>
-          <View style={styles.chartCard}>
-            {mockAnalytics.spendingByCategory.map((category, index) => (
-              <View key={index} style={styles.chartRow}>
-                <Text style={styles.chartLabel}>{category.category}</Text>
-                <View style={styles.chartBarContainer}>
-                  <View 
-                    style={[
-                      styles.chartBar, 
-                      { 
-                        width: `${(category.amount / maxAmount) * 100}%`,
-                        backgroundColor: category.color 
-                      }
-                    ]} 
-                  />
+        {spendingByCategory.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Spending Breakdown</Text>
+            <View style={styles.chartCard}>
+              {spendingByCategory.map((category: any, index: number) => (
+                <View key={index} style={styles.chartRow}>
+                  <Text style={styles.chartLabel} numberOfLines={1}>{category.category}</Text>
+                  <View style={styles.chartBarContainer}>
+                    <View
+                      style={[
+                        styles.chartBar,
+                        {
+                          width: `${(category.amount / maxAmount) * 100}%`,
+                          backgroundColor: category.color
+                        }
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.chartValue}>{formatCurrency(category.amount)}</Text>
                 </View>
-                <Text style={styles.chartValue}>{formatCurrency(category.amount)}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Monthly Comparison */}
         <View style={styles.section}>
@@ -147,13 +197,13 @@ export default function AnalyticsScreen() {
                 <View style={styles.comparisonItem}>
                   <Ionicons name="arrow-down" size={16} color="#10b981" />
                   <Text style={styles.comparisonIncome}>
-                    {formatCurrency(mockAnalytics.monthlyComparison.thisMonth.income)}
+                    {formatCurrency(monthlyComparison.thisMonth.income)}
                   </Text>
                 </View>
                 <View style={styles.comparisonItem}>
                   <Ionicons name="arrow-up" size={16} color="#ef4444" />
                   <Text style={styles.comparisonExpense}>
-                    {formatCurrency(mockAnalytics.monthlyComparison.thisMonth.expenses)}
+                    {formatCurrency(monthlyComparison.thisMonth.expenses)}
                   </Text>
                 </View>
               </View>
@@ -167,13 +217,13 @@ export default function AnalyticsScreen() {
                 <View style={styles.comparisonItem}>
                   <Ionicons name="arrow-down" size={16} color="#10b981" />
                   <Text style={styles.comparisonIncome}>
-                    {formatCurrency(mockAnalytics.monthlyComparison.lastMonth.income)}
+                    {formatCurrency(monthlyComparison.lastMonth.income)}
                   </Text>
                 </View>
                 <View style={styles.comparisonItem}>
                   <Ionicons name="arrow-up" size={16} color="#ef4444" />
                   <Text style={styles.comparisonExpense}>
-                    {formatCurrency(mockAnalytics.monthlyComparison.lastMonth.expenses)}
+                    {formatCurrency(monthlyComparison.lastMonth.expenses)}
                   </Text>
                 </View>
               </View>
@@ -200,7 +250,7 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* Bottom Spacing for Tab Bar */}
-        <View style={{ height: 20 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -227,6 +277,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 28,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#6b7280',
+    fontSize: 16,
   },
   scrollView: {
     flex: 1,
@@ -390,6 +450,7 @@ const styles = StyleSheet.create({
   comparisonValues: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 16,
   },
   comparisonItem: {
     flexDirection: 'row',
@@ -447,4 +508,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingLeft: 8,
   },
+  emptyStateCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyStateText: {
+    marginTop: 16,
+    color: '#94a3b8',
+    fontSize: 16,
+  }
 });

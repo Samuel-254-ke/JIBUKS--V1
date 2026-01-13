@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,311 +8,317 @@ import {
   TextInput,
   SafeAreaView,
   Alert,
-  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-
-const categoryOptions = [
-  { id: '1', name: 'Salary' },
-  { id: '2', name: 'Business' },
-  { id: '3', name: 'Investment' },
-  { id: '4', name: 'Gift' },
-  { id: '5', name: 'Other' },
-];
-
-const sourceOptions = [
-  { id: '1', name: 'Mpesa' },
-  { id: '2', name: 'Bank' },
-  { id: '3', name: 'Cash' },
-  { id: '4', name: 'Airtel Money' },
-  { id: '5', name: 'Other' },
-];
-
-// Mock family members - TODO: Load from API
-const familyMembers = [
-  { id: '1', name: 'David' },
-  { id: '2', name: 'Sarah' },
-  { id: '3', name: 'John' },
-];
+import apiService from '@/services/api';
 
 export default function AddIncomeScreen() {
   const router = useRouter();
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Salary');
-  const [source, setSource] = useState('Mpesa');
-  const [receivedBy, setReceivedBy] = useState('David');
-  const [date, setDate] = useState(new Date());
   const [description, setDescription] = useState('');
-  const [splitWithFamily, setSplitWithFamily] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedPayment, setSelectedPayment] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
-  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
+  useEffect(() => {
+    loadData();
+  }, []);
 
-    if (isToday) {
-      return `Today, ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [allCategories, methods] = await Promise.all([
+        apiService.getCategories(),
+        apiService.getPaymentMethods()
+      ]);
+
+      // Filter for income categories
+      const incomeCats = allCategories.filter((c: any) => c.type?.toLowerCase() === 'income');
+      setCategories(incomeCats);
+      setPaymentMethods(methods);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      Alert.alert('Error', 'Failed to load categories');
+    } finally {
+      setLoading(false);
     }
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const handleSubmit = () => {
-    // Validate amount
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const getIconName = (categoryName: string): any => {
+    const iconMap: { [key: string]: any } = {
+      'Salary': 'cash',
+      'Business': 'briefcase',
+      'Investment': 'trending-up',
+      'Gift': 'gift',
+      'Freelance': 'laptop',
+      'Bonus': 'star',
+      'Refund': 'return-up-back',
+      'Other': 'ellipsis-horizontal',
+      'Food': 'restaurant', // Fallbacks
+      'Transport': 'car',
+    };
+    return iconMap[categoryName] || 'ellipse';
+  };
+
+  const getPaymentIcon = (methodName: string): any => {
+    const iconMap: { [key: string]: any } = {
+      'Cash': 'cash',
+      'M-Pesa': 'phone-portrait',
+      'Bank Card': 'card',
+      'Bank Transfer': 'swap-horizontal',
+      'Mobile Money': 'phone-portrait'
+    };
+    return iconMap[methodName] || 'card';
+  };
+
+  const getCategoryColor = (categoryName: string) => {
+    const colorMap: { [key: string]: string } = {
+      'Salary': '#52C41A',
+      'Business': '#1890FF',
+      'Investment': '#722ED1',
+      'Gift': '#EB2F96',
+      'Freelance': '#13C2C2',
+      'Bonus': '#FAAD14',
+      'Refund': '#52C41A',
+      'Other': '#8C8C8C',
+    };
+    return colorMap[categoryName] || '#6b7280';
+  };
+
+  const handleSubmit = async () => {
+    // Validation
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid amount');
+      Alert.alert('Invalid Amount', 'Please enter a valid amount');
       return;
     }
 
-    // TODO: Submit to API
-    const incomeData = {
-      amount: parseFloat(amount),
-      category,
-      source,
-      receivedBy,
-      date: date.toISOString(),
-      description,
-      splitWithFamily,
-    };
+    if (!selectedCategory) {
+      Alert.alert('Category Required', 'Please select a category');
+      return;
+    }
 
-    console.log('Income data:', incomeData);
+    if (!selectedPayment) {
+      Alert.alert('Payment Method Required', 'Please select a payment method');
+      return;
+    }
 
-    // Show success message
-    Alert.alert(
-      'Success',
-      'Income added successfully!',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            try {
-              router.back();
-            } catch (error) {
-              console.error('Navigation error:', error);
-            }
+    try {
+      setSubmitting(true);
+
+      await apiService.createTransaction({
+        type: 'INCOME',
+        amount: parseFloat(amount),
+        category: selectedCategory,
+        description: description || selectedCategory,
+        paymentMethod: selectedPayment,
+        date: date.toISOString(),
+        notes: notes || undefined,
+      });
+
+      Alert.alert(
+        'Success',
+        'Income added successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.error || 'Failed to add income');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#1e3a8a', '#2563eb']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <LinearGradient colors={['#10b981', '#059669']} style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#f59e0b" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-
           <Text style={styles.headerTitle}>Add Income</Text>
-
           <View style={{ width: 40 }} />
         </View>
       </LinearGradient>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.formCard}>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#10b981" />
+        </View>
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Amount Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Amount</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.currencyPrefix}>KES</Text>
+          <View style={styles.amountSection}>
+            <Text style={styles.amountLabel}>Amount (KES)</Text>
+            <View style={styles.amountInputContainer}>
+              <Text style={styles.currencySymbol}>KES</Text>
               <TextInput
-                style={styles.input}
-                placeholder="25,000"
-                placeholderTextColor="#9ca3af"
+                style={styles.amountInput}
+                placeholder="0"
+                placeholderTextColor="#d1d5db"
                 keyboardType="numeric"
                 value={amount}
                 onChangeText={setAmount}
+                autoFocus
               />
             </View>
           </View>
 
-          {/* Category Dropdown */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Category</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => {
-                setShowCategoryDropdown(!showCategoryDropdown);
-                setShowSourceDropdown(false);
-                setShowMemberDropdown(false);
-              }}
-            >
-              <Text style={styles.dropdownText}>{category}</Text>
-              <Ionicons name="chevron-down" size={20} color="#6b7280" />
-            </TouchableOpacity>
-            {showCategoryDropdown && (
-              <View style={styles.dropdownMenu}>
-                {categoryOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    style={styles.dropdownMenuItem}
-                    onPress={() => {
-                      setCategory(option.name);
-                      setShowCategoryDropdown(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownMenuItemText,
-                        category === option.name && styles.dropdownMenuItemTextSelected,
-                      ]}
-                    >
-                      {option.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Source Dropdown */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Source</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => {
-                setShowSourceDropdown(!showSourceDropdown);
-                setShowCategoryDropdown(false);
-                setShowMemberDropdown(false);
-              }}
-            >
-              <Text style={styles.dropdownText}>{source}</Text>
-              <Ionicons name="chevron-down" size={20} color="#6b7280" />
-            </TouchableOpacity>
-            {showSourceDropdown && (
-              <View style={styles.dropdownMenu}>
-                {sourceOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    style={styles.dropdownMenuItem}
-                    onPress={() => {
-                      setSource(option.name);
-                      setShowSourceDropdown(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownMenuItemText,
-                        source === option.name && styles.dropdownMenuItemTextSelected,
-                      ]}
-                    >
-                      {option.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Received By Dropdown */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Received By</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => {
-                setShowMemberDropdown(!showMemberDropdown);
-                setShowCategoryDropdown(false);
-                setShowSourceDropdown(false);
-              }}
-            >
-              <Text style={styles.dropdownText}>{receivedBy}</Text>
-              <Ionicons name="chevron-down" size={20} color="#6b7280" />
-            </TouchableOpacity>
-            {showMemberDropdown && (
-              <View style={styles.dropdownMenu}>
-                {familyMembers.map((member) => (
-                  <TouchableOpacity
-                    key={member.id}
-                    style={styles.dropdownMenuItem}
-                    onPress={() => {
-                      setReceivedBy(member.name);
-                      setShowMemberDropdown(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownMenuItemText,
-                        receivedBy === member.name && styles.dropdownMenuItemTextSelected,
-                      ]}
-                    >
-                      {member.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Date Picker */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Date</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => {
-                // TODO: Implement native date picker
-                Alert.alert('Date Picker', 'Date picker will be implemented with native component');
-              }}
-            >
-              <Text style={styles.dropdownText}>{formatDate(date)}</Text>
-              <Ionicons name="calendar-outline" size={20} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Description Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description</Text>
+          {/* Description */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Description (Optional)</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="November Salary"
+              style={styles.textInput}
+              placeholder="e.g., Monthly salary"
               placeholderTextColor="#9ca3af"
-              multiline
-              numberOfLines={4}
               value={description}
               onChangeText={setDescription}
             />
           </View>
 
-          {/* Split Option */}
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => setSplitWithFamily(!splitWithFamily)}
-          >
-            <View style={styles.checkbox}>
-              {splitWithFamily && (
-                <Ionicons name="checkmark" size={18} color="#2563eb" />
-              )}
+          {/* Category Selection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Category *</Text>
+            <View style={styles.categoriesGrid}>
+              {categories.map((category) => {
+                const color = category.color || getCategoryColor(category.name);
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[
+                      styles.categoryCard,
+                      selectedCategory === category.name && {
+                        backgroundColor: color + '20',
+                        borderColor: color,
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setSelectedCategory(category.name)}
+                  >
+                    <View
+                      style={[
+                        styles.categoryIcon,
+                        selectedCategory === category.name
+                          ? { backgroundColor: color + '30' }
+                          : { backgroundColor: '#f3f4f6' }
+                      ]}
+                    >
+                      <Ionicons
+                        name={getIconName(category.name)}
+                        size={24}
+                        color={selectedCategory === category.name ? color : '#6b7280'}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.categoryName,
+                        selectedCategory === category.name && { fontWeight: '700', color: color },
+                      ]}
+                    >
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            <Text style={styles.checkboxLabel}>Split this income with family</Text>
-          </TouchableOpacity>
+          </View>
+
+          {/* Payment Method */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Payment Method *</Text>
+            <View style={styles.paymentGrid}>
+              {paymentMethods.map((method) => (
+                <TouchableOpacity
+                  key={method.id}
+                  style={[
+                    styles.paymentCard,
+                    selectedPayment === method.name && styles.paymentCardActive,
+                  ]}
+                  onPress={() => setSelectedPayment(method.name)}
+                >
+                  <Ionicons
+                    name={getPaymentIcon(method.name)}
+                    size={24}
+                    color={selectedPayment === method.name ? '#10b981' : '#6b7280'}
+                  />
+                  <Text
+                    style={[
+                      styles.paymentName,
+                      selectedPayment === method.name && styles.paymentNameActive,
+                    ]}
+                  >
+                    {method.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Date */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Date</Text>
+            <View style={styles.dateCard}>
+              <Ionicons name="calendar" size={20} color="#6b7280" />
+              <Text style={styles.dateText}>{formatDate(date)}</Text>
+            </View>
+          </View>
+
+          {/* Notes */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Notes (Optional)</Text>
+            <TextInput
+              style={styles.notesInput}
+              placeholder="Add any additional notes..."
+              placeholderTextColor="#9ca3af"
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </View>
 
           {/* Submit Button */}
           <TouchableOpacity
-            style={styles.submitButton}
+            style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
             onPress={handleSubmit}
+            disabled={submitting}
           >
-            <Text style={styles.submitButtonText}>Add Income</Text>
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                <Text style={styles.submitButtonText}>Add Income</Text>
+              </>
+            )}
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -320,12 +326,14 @@ export default function AddIncomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f3f4f6',
   },
   header: {
     paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 20,
     paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   headerContent: {
     flexDirection: 'row',
@@ -333,147 +341,180 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#f59e0b',
-    flex: 1,
-    textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#fff',
   },
-  scrollView: {
+  content: {
     flex: 1,
   },
-  formCard: {
+  amountSection: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: 8,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 40,
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 24,
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  inputGroup: {
-    marginBottom: 20,
-    position: 'relative',
-  },
-  label: {
+  amountLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 8,
+    color: '#6b7280',
+    marginBottom: 12,
   },
-  inputContainer: {
+  amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
   },
-  currencyPrefix: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6b7280',
+  currencySymbol: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#10b981',
     marginRight: 8,
   },
-  input: {
+  amountInput: {
     flex: 1,
-    paddingVertical: 14,
-    fontSize: 16,
+    fontSize: 48,
+    fontWeight: 'bold',
     color: '#1f2937',
   },
-  textArea: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#fff',
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    top: 75,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    zIndex: 1000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    maxHeight: 200,
-  },
-  dropdownMenuItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  dropdownMenuItemText: {
-    fontSize: 15,
-    color: '#4b5563',
-  },
-  dropdownMenuItemTextSelected: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  section: {
+    marginHorizontal: 20,
     marginBottom: 24,
-    marginTop: 8,
   },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  textInput: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1f2937',
+    borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  categoryCard: {
+    width: '22%',
+    aspectRatio: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  checkboxLabel: {
-    fontSize: 15,
-    color: '#4b5563',
+  categoryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  categoryName: {
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  paymentGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  paymentCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  paymentCardActive: {
+    backgroundColor: '#d1fae5',
+    borderColor: '#10b981',
+  },
+  paymentName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  paymentNameActive: {
+    color: '#10b981',
+  },
+  dateCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  notesInput: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    minHeight: 100,
   },
   submitButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: '#10b981',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 5,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

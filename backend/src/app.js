@@ -7,6 +7,12 @@ import morgan from 'morgan';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import familyRoutes from './routes/family.js';
+import transactionRoutes from './routes/transactions.js';
+import categoryRoutes from './routes/categories.js';
+import paymentMethodRoutes from './routes/paymentMethods.js';
+import dashboardRoutes from './routes/dashboard.js';
+import goalsRoutes from './routes/goals.js';
+import budgetsRoutes from './routes/budgets.js';
 
 const app = express();
 
@@ -43,7 +49,9 @@ const buildCorsOrigins = () => {
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: buildCorsOrigins(),
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://your-production-domain.com']
+    : true, // Allow all origins in development
   credentials: true
 }));
 
@@ -80,6 +88,12 @@ app.get('/', (req, res) => res.json({ ok: true, message: 'JIBUKS backend' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/family', familyRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/payment-methods', paymentMethodRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/goals', goalsRoutes);
+app.use('/api/budgets', budgetsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

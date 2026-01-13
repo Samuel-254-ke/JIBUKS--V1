@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,8 +9,7 @@ const { width } = Dimensions.get('window');
 
 export default function TaxAndInvoiceScreen() {
     const router = useRouter();
-    const params = useLocalSearchParams();
-    const [vatChoice, setVatChoice] = useState('yes'); // 'yes' or 'no'
+    const params = useLocalSearchParams(); const [vatChoice, setVatChoice] = useState('yes'); // 'yes' or 'no'
     const [styleChoice, setStyleChoice] = useState('simple'); // 'simple' or 'detailed'
 
     const handleContinue = () => {
@@ -35,7 +35,7 @@ export default function TaxAndInvoiceScreen() {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             {/* Header */}
             <LinearGradient
                 colors={['#1e3a8a', '#2563eb']}
@@ -101,7 +101,7 @@ export default function TaxAndInvoiceScreen() {
                     <Text style={styles.footerText}>Powered by Apbc</Text>
                 </View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -111,9 +111,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#1e3a8a',
     },
     header: {
-        paddingTop: 60,
         paddingHorizontal: 24,
         paddingBottom: 32,
+        paddingTop: 10, // Reduced as SafeAreaView handles top spacing
     },
     headerContent: {
         flexDirection: 'row',

@@ -59,8 +59,7 @@ const Login = () => {
   }
 
   const handleForgotPassword = () => {
-    // Handle forgot password
-    console.log('Forgot password pressed')
+    router.push('/forgot-password')
   }
 
   return (

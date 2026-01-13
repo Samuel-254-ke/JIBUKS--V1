@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +18,13 @@ export default function BusinessOnboardingSuccessScreen() {
     const template = params.styleChoice === 'simple' ? 'Simple Style' : 'Detailed Style';
 
     const handleStart = () => {
-        router.replace('/(tabs)');
+        router.replace({
+            pathname: '/(tabs)/business-dashboard',
+            params: {
+                businessName,
+                ownerName: 'Doris' // Default for now as per design
+            }
+        });
     };
 
     const InfoRow = ({ label, value }: { label: string; value: string }) => (
@@ -33,7 +40,7 @@ export default function BusinessOnboardingSuccessScreen() {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             {/* Blue Header Section */}
             <LinearGradient
                 colors={['#1e3a8a', '#2563eb']}
@@ -75,7 +82,7 @@ export default function BusinessOnboardingSuccessScreen() {
                     <Text style={styles.footerText}>Powered by Apbc</Text>
                 </View>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -85,10 +92,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#1e3a8a',
     },
     header: {
-        paddingTop: 80,
         paddingHorizontal: 24,
         paddingBottom: 60,
         alignItems: 'center',
+        paddingTop: 20, // Reduced as SafeAreaView handles top spacing
     },
     headerContent: {
         alignItems: 'center',

@@ -17,33 +17,6 @@ import apiService from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
-// Mock data for enhanced features
-// TODO: Replace with real API calls when backend is ready
-const enhancedMockData = {
-  balance: {
-    total: 24580,
-    accountsCount: 3
-  },
-  monthlyBudget: {
-    title: "MONTHLY BUDGET",
-    spent: 31000,
-    remaining: 71000,
-    progress: 40
-  },
-  goalProgress: {
-    name: "NEW CAR FUND",
-    current: 200000,
-    target: 500000,
-    progress: 40
-  },
-  recentActivity: [
-    { id: 1, name: "Supermarket", amount: -2400, time: "Today 3:24 PM", category: "Food", type: "expense" as const },
-    { id: 2, name: "M-pesa", amount: 21400, time: "Today 12:20 PM", category: "mpesa", type: "income" as const },
-    { id: 3, name: "Rent", amount: -12500, time: "Oct 28", category: "Housing", type: "expense" as const },
-    { id: 4, name: "Salary", amount: 50000, time: "Oct 25", category: "Income", type: "income" as const },
-  ]
-};
-
 export default function HomeScreen() {
   const router = useRouter();
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -70,8 +43,42 @@ export default function HomeScreen() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getDashboardStats();
-      setDashboardData(data);
+      const data = await apiService.getDashboard();
+
+      // Transform the data to match the component's expected format
+      const transformedData = {
+        familyName: data.familyMembers?.[0]?.name || 'Your Family',
+        totalMembers: data.familyMembers?.length || 0,
+        activeGoals: data.goals?.length || 0,
+        totalBudget: data.budgets?.reduce((sum: number, b: any) => sum + Number(b.amount), 0) || 0,
+        monthlySpending: Number(data.summary?.totalExpenses) || 0,
+        recentGoals: data.goals?.slice(0, 3).map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          current: Number(g.currentAmount),
+          target: Number(g.targetAmount),
+          deadline: g.targetDate ? new Date(g.targetDate).toLocaleDateString() : 'No deadline'
+        })) || [],
+        budgetOverview: data.budgets?.slice(0, 3).map((b: any) => {
+          const spent = data.categorySpending?.find((c: any) => c.category === b.category)?.amount || 0;
+          return {
+            category: b.category,
+            allocated: Number(b.amount),
+            spent: Number(spent)
+          };
+        }) || [],
+        recentTransactions: data.recentTransactions?.slice(0, 4).map((t: any) => ({
+          id: t.id,
+          name: t.description || t.category,
+          amount: Number(t.amount),
+          time: new Date(t.date).toLocaleDateString(),
+          category: t.category,
+          type: t.type.toLowerCase()
+        })) || [],
+        summary: data.summary || { totalIncome: 0, totalExpenses: 0, balance: 0 }
+      };
+
+      setDashboardData(transformedData);
     } catch (error: any) {
       // If user has no family, redirect to family setup
       if (error.error === 'User is not part of any family' ||
@@ -234,8 +241,11 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceTitle}>BALANCE</Text>
-            <Text style={styles.balanceAmount}>{formatCurrency(enhancedMockData.balance.total)}</Text>
-            <Text style={styles.balanceSubtitle}>Across {enhancedMockData.balance.accountsCount} accounts</Text>
+            <Text style={styles.balanceAmount}>{formatCurrency(dashboardData.summary?.balance || 0)}</Text>
+            <Text style={styles.balanceSubtitle}>
+              Income: {formatCurrency(dashboardData.summary?.totalIncome || 0)} |
+              Expenses: {formatCurrency(dashboardData.summary?.totalExpenses || 0)}
+            </Text>
           </View>
         </View>
 
@@ -283,37 +293,55 @@ export default function HomeScreen() {
         </View>
 
         {/* Progress Cards Row */}
-        <View style={styles.section}>
-          <View style={styles.progressCardsRow}>
-            {/* Monthly Budget Progress */}
-            <View style={styles.progressCard}>
-              <Text style={styles.progressCardTitle}>{enhancedMockData.monthlyBudget.title}</Text>
-              <View style={styles.progressBarContainer}>
-                <View style={[styles.progressBar, { width: `${enhancedMockData.monthlyBudget.progress}%`, backgroundColor: '#f59e0b' }]} />
-              </View>
-              <View style={styles.progressCardDetails}>
-                <Text style={styles.progressCardText}>Spent: {formatCurrency(enhancedMockData.monthlyBudget.spent)}</Text>
-                <Text style={styles.progressCardText}>Left: {formatCurrency(enhancedMockData.monthlyBudget.remaining)}</Text>
-              </View>
-            </View>
+        {dashboardData.budgetOverview && dashboardData.budgetOverview.length > 0 && dashboardData.recentGoals && dashboardData.recentGoals.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.progressCardsRow}>
+              {/* Monthly Budget Progress */}
+              {dashboardData.budgetOverview[0] && (
+                <View style={styles.progressCard}>
+                  <Text style={styles.progressCardTitle}>{dashboardData.budgetOverview[0].category.toUpperCase()} BUDGET</Text>
+                  <View style={styles.progressBarContainer}>
+                    <View style={[
+                      styles.progressBar,
+                      {
+                        width: `${Math.min(calculateProgress(dashboardData.budgetOverview[0].spent, dashboardData.budgetOverview[0].allocated), 100)}%`,
+                        backgroundColor: '#f59e0b'
+                      }
+                    ]} />
+                  </View>
+                  <View style={styles.progressCardDetails}>
+                    <Text style={styles.progressCardText}>Spent: {formatCurrency(dashboardData.budgetOverview[0].spent)}</Text>
+                    <Text style={styles.progressCardText}>Left: {formatCurrency(dashboardData.budgetOverview[0].allocated - dashboardData.budgetOverview[0].spent)}</Text>
+                  </View>
+                </View>
+              )}
 
-            {/* Goal Progress */}
-            <View style={styles.progressCard}>
-              <Text style={styles.progressCardTitle}>{enhancedMockData.goalProgress.name}</Text>
-              <View style={styles.progressBarContainer}>
-                <View style={[styles.progressBar, { width: `${enhancedMockData.goalProgress.progress}%`, backgroundColor: '#2563eb' }]} />
-              </View>
-              <Text style={styles.progressCardAmount}>
-                {formatCurrency(enhancedMockData.goalProgress.current)} / {formatCurrency(enhancedMockData.goalProgress.target)}
-              </Text>
+              {/* Goal Progress */}
+              {dashboardData.recentGoals[0] && (
+                <View style={styles.progressCard}>
+                  <Text style={styles.progressCardTitle}>{dashboardData.recentGoals[0].name.toUpperCase()}</Text>
+                  <View style={styles.progressBarContainer}>
+                    <View style={[
+                      styles.progressBar,
+                      {
+                        width: `${calculateProgress(dashboardData.recentGoals[0].current, dashboardData.recentGoals[0].target)}%`,
+                        backgroundColor: '#2563eb'
+                      }
+                    ]} />
+                  </View>
+                  <Text style={styles.progressCardAmount}>
+                    {formatCurrency(dashboardData.recentGoals[0].current)} / {formatCurrency(dashboardData.recentGoals[0].target)}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
-        </View>
+        )}
 
         {/* Action Buttons */}
         <View style={styles.section}>
           <View style={styles.actionButtonsRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButtonSquare}
               onPress={() => {
                 try {
@@ -329,7 +357,7 @@ export default function HomeScreen() {
               <Text style={styles.actionButtonLabel}>Income</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButtonSquare}
               onPress={() => {
                 try {
@@ -345,7 +373,7 @@ export default function HomeScreen() {
               <Text style={styles.actionButtonLabel}>Expense</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButtonSquare}
               onPress={() => {
                 try {
@@ -367,34 +395,43 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>RECENT FAMILY ACTIVITY</Text>
           <View style={styles.activityCard}>
-            {enhancedMockData.recentActivity.map((activity) => (
-              <View key={activity.id} style={styles.activityItem}>
-                <View style={styles.activityLeft}>
-                  <View style={[
-                    styles.activityIconCircle,
-                    { backgroundColor: activity.type === 'income' ? '#d1fae5' : '#fee2e2' }
+            {dashboardData.recentTransactions && dashboardData.recentTransactions.length > 0 ? (
+              dashboardData.recentTransactions.map((activity: any) => (
+                <View key={activity.id} style={styles.activityItem}>
+                  <View style={styles.activityLeft}>
+                    <View style={[
+                      styles.activityIconCircle,
+                      { backgroundColor: activity.type === 'income' ? '#d1fae5' : '#fee2e2' }
+                    ]}>
+                      <Ionicons
+                        name={activity.type === 'income' ? 'arrow-down' : 'arrow-up'}
+                        size={20}
+                        color={activity.type === 'income' ? '#10b981' : '#ef4444'}
+                      />
+                    </View>
+                    <View style={styles.activityDetails}>
+                      <Text style={styles.activityName}>{activity.name}</Text>
+                      <Text style={styles.activityTime}>{activity.time} | {activity.category}</Text>
+                    </View>
+                  </View>
+                  <Text style={[
+                    styles.activityAmount,
+                    { color: activity.type === 'income' ? '#10b981' : '#ef4444' }
                   ]}>
-                    <Ionicons 
-                      name={activity.type === 'income' ? 'arrow-down' : 'arrow-up'} 
-                      size={20} 
-                      color={activity.type === 'income' ? '#10b981' : '#ef4444'} 
-                    />
-                  </View>
-                  <View style={styles.activityDetails}>
-                    <Text style={styles.activityName}>{activity.name}</Text>
-                    <Text style={styles.activityTime}>{activity.time} | {activity.category}</Text>
-                  </View>
+                    {activity.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(activity.amount))}
+                  </Text>
                 </View>
-                <Text style={[
-                  styles.activityAmount,
-                  { color: activity.type === 'income' ? '#10b981' : '#ef4444' }
-                ]}>
-                  {activity.type === 'income' ? '+' : ''}{formatCurrency(activity.amount)}
-                </Text>
-              </View>
-            ))}
+              ))
+            ) : (
+              <Text style={{ textAlign: 'center', color: '#6b7280', padding: 20 }}>
+                No recent transactions
+              </Text>
+            )}
           </View>
-          <TouchableOpacity style={styles.viewAllButton}>
+          <TouchableOpacity
+            style={styles.viewAllButton}
+            onPress={() => router.push('/(tabs)/transactions' as any)}
+          >
             <Text style={styles.viewAllButtonText}>View all Activity</Text>
           </TouchableOpacity>
         </View>
@@ -414,37 +451,58 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {dashboardData.recentGoals.map((goal: any) => {
-            const progress = calculateProgress(goal.current, goal.target);
-            return (
-              <TouchableOpacity
-                key={goal.id}
-                style={styles.goalCard}
-                onPress={() => {
-                  try {
-                    (router.push as any)('/recent-goals');
-                  } catch (error) {
-                    console.error('Navigation error:', error);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.goalHeader}>
-                  <Text style={styles.goalName}>{goal.name}</Text>
-                  <Text style={styles.goalDeadline}>{goal.deadline}</Text>
+          {dashboardData.recentGoals && dashboardData.recentGoals.length > 0 ? (
+            dashboardData.recentGoals.map((goal: any) => {
+              const progress = calculateProgress(goal.current, goal.target);
+              return (
+                <View key={goal.id} style={styles.goalCard}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      try {
+                        (router.push as any)('/recent-goals');
+                      } catch (error) {
+                        console.error('Navigation error:', error);
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.goalHeader}>
+                      <Text style={styles.goalName}>{goal.name}</Text>
+                      <Text style={styles.goalDeadline}>{goal.deadline}</Text>
+                    </View>
+                    <View style={styles.goalAmounts}>
+                      <Text style={styles.goalAmount}>
+                        {formatCurrency(goal.current)} / {formatCurrency(goal.target)}
+                      </Text>
+                      <Text style={styles.goalPercentage}>{progress.toFixed(0)}%</Text>
+                    </View>
+                    <View style={styles.progressBarContainer}>
+                      <View style={[styles.progressBar, { width: `${progress}%` }]} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Add Money Button */}
+                  <TouchableOpacity
+                    style={styles.addToGoalButton}
+                    onPress={() => {
+                      try {
+                        (router.push as any)(`/add-to-goal?goalId=${goal.id}`);
+                      } catch (error) {
+                        console.error('Navigation error:', error);
+                      }
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#7c3aed" />
+                    <Text style={styles.addToGoalButtonText}>Add Money</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.goalAmounts}>
-                  <Text style={styles.goalAmount}>
-                    {formatCurrency(goal.current)} / {formatCurrency(goal.target)}
-                  </Text>
-                  <Text style={styles.goalPercentage}>{progress.toFixed(0)}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBar, { width: `${progress}%` }]} />
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+              );
+            })
+          ) : (
+            <Text style={{ textAlign: 'center', color: '#6b7280', padding: 20 }}>
+              No active goals
+            </Text>
+          )}
         </View>
 
         {/* Budget Overview Section */}
@@ -557,7 +615,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Bottom Spacing for Tab Bar */}
-        <View style={{ height: 20 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -629,6 +687,34 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     fontWeight: '700',
     marginTop: 4,
+  },
+  balanceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  balanceTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  balanceAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  balanceSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
   },
   statsContainer: {
     paddingHorizontal: 20,
@@ -732,6 +818,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2563eb',
   },
+  addToGoalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3e8ff',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  addToGoalButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7c3aed',
+  },
   progressBarContainer: {
     height: 8,
     backgroundColor: '#e5e7eb',
@@ -810,35 +911,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   // New styles for enhanced dashboard
-  balanceCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  balanceTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  balanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#f59e0b',
-    marginBottom: 8,
-  },
-  balanceSubtitle: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
   progressCardsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

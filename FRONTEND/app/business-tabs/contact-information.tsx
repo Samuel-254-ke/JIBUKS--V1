@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,7 +36,7 @@ export default function ContactInformationScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             {/* Blue Header Section */}
             <LinearGradient
                 colors={['#1e3a8a', '#2563eb']}
@@ -110,7 +111,7 @@ export default function ContactInformationScreen() {
                     <Text style={styles.footerText}>Powered by Apbc</Text>
                 </View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -120,9 +121,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#1e3a8a',
     },
     header: {
-        paddingTop: 60,
         paddingHorizontal: 24,
         paddingBottom: 32,
+        paddingTop: 10, // Reduced as SafeAreaView handles top spacing
     },
     headerContent: {
         flexDirection: 'row',

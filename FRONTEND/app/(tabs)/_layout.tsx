@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform, View, StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,20 +9,35 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const themeColors = Colors[colorScheme ?? 'light'];
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#2563eb', // Premium Blue
+        tabBarInactiveTintColor: '#9ca3af',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
+          backgroundColor: '#ffffff',
+          borderTopWidth: 0,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          height: Platform.OS === 'android' ? 70 : 85,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'android' ? 12 : 30,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          paddingBottom: 4,
         },
       }}>
       <Tabs.Screen
@@ -29,7 +45,9 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={26} color={color} />
+            </View>
           ),
         }}
       />
@@ -38,16 +56,20 @@ export default function TabLayout() {
         options={{
           title: 'Analytics',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={24} color={color} />
+            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+              <Ionicons name={focused ? 'pie-chart' : 'pie-chart-outline'} size={26} color={color} />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
-          title: 'Transactions',
+          title: 'Activity',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'list' : 'list-outline'} size={24} color={color} />
+            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={26} color={color} />
+            </View>
           ),
         }}
       />
@@ -56,17 +78,40 @@ export default function TabLayout() {
         options={{
           title: 'Community',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} size={24} color={color} />
+            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+              <Ionicons name={focused ? 'people' : 'people-outline'} size={26} color={color} />
+            </View>
           ),
         }}
       />
-      {/* Keep explore tab but hide it */}
+
+      {/* Business Dashboard Tab - Hidden/Removed from bar */}
+      <Tabs.Screen
+        name="business-dashboard"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+
+      {/* Hidden Tabs */}
       <Tabs.Screen
         name="explore"
         options={{
-          href: null, // This hides the tab
+          href: null,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
+    borderRadius: 12,
+  },
+  activeIconContainer: {
+    backgroundColor: '#eff6ff', // Light blue background for active state
+  },
+});
