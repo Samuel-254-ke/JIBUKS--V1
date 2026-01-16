@@ -430,6 +430,7 @@ model InventoryItem {
   tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   movements       StockMovement[]
   purchaseItems   PurchaseItem[]
+  invoiceItems    InvoiceItem[] 
   
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -445,7 +446,7 @@ model StockMovement {
   quantity        Decimal
   unitCost        Decimal?     @map("unit_cost")
   reference       String?      // Purchase ID, Sale ID, Adjustment ID
-  date            DateTime     @default(now())
+  date            DateTime     @default(now()) @map("date")
   notes           String?
   journalId       Int?         @map("journal_id")
   createdById     Int?         @map("created_by_id")
