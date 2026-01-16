@@ -146,18 +146,23 @@ const getAuthHeaders = async () => {
 class ApiService {
   private baseUrl: string;
   private mockCategories: Category[] = [
-    { id: 'cat-exp-food', name: 'Food', type: 'expense', color: '#FF6B6B' },
-    { id: 'cat-exp-transport', name: 'Transport', type: 'expense', color: '#4ECDC4' },
-    { id: 'cat-exp-housing', name: 'Housing', type: 'expense', color: '#45B7D1' },
-    { id: 'cat-exp-utilities', name: 'Utilities', type: 'expense', color: '#FFA07A' },
-    { id: 'cat-exp-entertainment', name: 'Entertainment', type: 'expense', color: '#98D8C8' },
-    { id: 'cat-exp-health', name: 'Healthcare', type: 'expense', color: '#F7DC6F' },
-    { id: 'cat-exp-education', name: 'Education', type: 'expense', color: '#BB8FCE' },
-    { id: 'cat-exp-shopping', name: 'Shopping', type: 'expense', color: '#85C1E2' },
-    { id: 'cat-inc-salary', name: 'Salary', type: 'income', color: '#52C41A' },
-    { id: 'cat-inc-business', name: 'Business', type: 'income', color: '#1890FF' },
-    { id: 'cat-inc-investment', name: 'Investment', type: 'income', color: '#722ED1' },
-    { id: 'cat-inc-gift', name: 'Gift', type: 'income', color: '#EB2F96' },
+    // Expense Categories
+    { id: 'cat-exp-food', name: 'Food', type: 'expense', color: '#FF6B6B', icon: 'restaurant' },
+    { id: 'cat-exp-transport', name: 'Transport', type: 'expense', color: '#4ECDC4', icon: 'car' },
+    { id: 'cat-exp-housing', name: 'Housing', type: 'expense', color: '#45B7D1', icon: 'home' },
+    { id: 'cat-exp-utilities', name: 'Utilities', type: 'expense', color: '#FFA07A', icon: 'flash' },
+    { id: 'cat-exp-entertainment', name: 'Entertainment', type: 'expense', color: '#98D8C8', icon: 'film' },
+    { id: 'cat-exp-health', name: 'Healthcare', type: 'expense', color: '#F7DC6F', icon: 'medical' },
+    { id: 'cat-exp-education', name: 'Education', type: 'expense', color: '#BB8FCE', icon: 'school' },
+    { id: 'cat-exp-shopping', name: 'Shopping', type: 'expense', color: '#85C1E2', icon: 'bag' },
+    
+    // Income Categories
+    { id: 'cat-inc-salary', name: 'Salary', type: 'income', color: '#52C41A', icon: 'cash' },
+    { id: 'cat-inc-business', name: 'Business', type: 'income', color: '#1890FF', icon: 'briefcase' },
+    { id: 'cat-inc-investment', name: 'Investment', type: 'income', color: '#722ED1', icon: 'trending-up' },
+    { id: 'cat-inc-gift', name: 'Gift', type: 'income', color: '#EB2F96', icon: 'gift' },
+    { id: 'cat-inc-freelance', name: 'Freelance', type: 'income', color: '#13C2C2', icon: 'laptop' },
+    { id: 'cat-inc-bonus', name: 'Bonus', type: 'income', color: '#FAAD14', icon: 'star' },
   ];
 
   private mockPaymentMethods: PaymentMethod[] = [

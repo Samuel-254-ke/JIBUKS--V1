@@ -1,6 +1,7 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
 import { verifyJWT } from '../middleware/auth.js';
+import { seedFamilyPaymentMethods } from '../services/accountingService.js';
 
 const router = express.Router();
 
@@ -134,6 +135,54 @@ router.delete('/:id', async (req, res) => {
     } catch (error) {
         console.error('Error deleting payment method:', error);
         res.status(500).json({ error: 'Failed to delete payment method' });
+    }
+});
+
+// Seed default payment methods for the family
+router.post('/seed', async (req, res) => {
+    try {
+        const { tenantId, role } = req.user;
+
+        if (!tenantId) {
+            return res.status(400).json({ error: 'User is not part of any family' });
+        }
+
+        // Only owners and admins can seed payment methods
+        if (role !== 'OWNER' && role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Only owners or admins can seed payment methods' });
+        }
+
+        const { force = false } = req.body;
+
+        // Check existing payment methods
+        const existingCount = await prisma.paymentMethod.count({
+            where: { tenantId }
+        });
+
+        if (existingCount > 0 && !force) {
+            return res.status(400).json({
+                error: 'Payment methods already exist. Use force=true to reseed.',
+                existingCount
+            });
+        }
+
+        // If force, delete all existing payment methods (careful!)
+        if (force && existingCount > 0) {
+            await prisma.paymentMethod.deleteMany({
+                where: { tenantId }
+            });
+        }
+
+        // Seed payment methods
+        const count = await seedFamilyPaymentMethods(tenantId);
+
+        res.json({
+            message: 'Payment methods seeded successfully',
+            paymentMethodsCreated: count
+        });
+    } catch (error) {
+        console.error('Error seeding payment methods:', error);
+        res.status(500).json({ error: 'Failed to seed payment methods' });
     }
 });
 

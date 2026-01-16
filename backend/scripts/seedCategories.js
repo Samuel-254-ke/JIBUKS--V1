@@ -1,71 +1,56 @@
+/**
+ * Script to seed categories for existing families
+ * Run this if you have an existing family that doesn't have categories yet
+ * 
+ * Usage: node scripts/seedCategories.js
+ */
+
 import { prisma } from '../src/lib/prisma.js';
+import { seedFamilyCategories } from '../src/services/accountingService.js';
 
-const defaultCategories = [
-    // Expense categories
-    { name: 'Food', type: 'expense', icon: 'cart', color: '#FF6B6B' },
-    { name: 'Transport', type: 'expense', icon: 'car', color: '#4ECDC4' },
-    { name: 'Housing', type: 'expense', icon: 'home', color: '#45B7D1' },
-    { name: 'Utilities', type: 'expense', icon: 'flash', color: '#FFA07A' },
-    { name: 'Entertainment', type: 'expense', icon: 'film', color: '#98D8C8' },
-    { name: 'Healthcare', type: 'expense', icon: 'medical', color: '#F7DC6F' },
-    { name: 'Education', type: 'expense', icon: 'school', color: '#BB8FCE' },
-    { name: 'Shopping', type: 'expense', icon: 'bag', color: '#85C1E2' },
-
-    // Income categories
-    { name: 'Salary', type: 'income', icon: 'cash', color: '#52C41A' },
-    { name: 'Business', type: 'income', icon: 'briefcase', color: '#1890FF' },
-    { name: 'Investment', type: 'income', icon: 'trending-up', color: '#722ED1' },
-    { name: 'Gift', type: 'income', icon: 'gift', color: '#EB2F96' },
-    { name: 'Other', type: 'income', icon: 'ellipsis-horizontal', color: '#8C8C8C' },
-];
-
-async function seedCategories() {
+async function main() {
     try {
-        console.log('🌱 Seeding categories...');
+        console.log('🌱 Starting category seeding for all families...\n');
 
         // Get all tenants
-        const tenants = await prisma.tenant.findMany();
+        const tenants = await prisma.tenant.findMany({
+            select: {
+                id: true,
+                name: true,
+                _count: {
+                    select: {
+                        categories: true
+                    }
+                }
+            }
+        });
 
-        if (tenants.length === 0) {
-            console.log('⚠️  No tenants found. Create a family first.');
-            return;
-        }
+        console.log(`Found ${tenants.length} families\n`);
 
         for (const tenant of tenants) {
-            console.log(`\n📦 Seeding categories for tenant: ${tenant.name}`);
+            console.log(`Processing family: ${tenant.name} (ID: ${tenant.id})`);
+            
+            if (tenant._count.categories > 0) {
+                console.log(`  ⏭️  Already has ${tenant._count.categories} categories, skipping\n`);
+                continue;
+            }
 
-            for (const category of defaultCategories) {
-                try {
-                    const created = await prisma.category.upsert({
-                        where: {
-                            tenantId_name_type: {
-                                tenantId: tenant.id,
-                                name: category.name,
-                                type: category.type
-                            }
-                        },
-                        update: {
-                            icon: category.icon,
-                            color: category.color
-                        },
-                        create: {
-                            tenantId: tenant.id,
-                            ...category
-                        }
-                    });
-                    console.log(`  ✓ ${category.type}: ${category.name}`);
-                } catch (error) {
-                    console.error(`  ✗ Error creating ${category.name}:`, error.message);
-                }
+            try {
+                const count = await seedFamilyCategories(tenant.id);
+                console.log(`  ✅ Seeded ${count} categories\n`);
+            } catch (error) {
+                console.error(`  ❌ Error seeding categories:`, error.message, '\n');
             }
         }
 
-        console.log('\n✅ Categories seeded successfully!');
+        console.log('✨ Category seeding complete!');
     } catch (error) {
-        console.error('❌ Error seeding categories:', error);
+        console.error('Fatal error:', error);
+        process.exit(1);
     } finally {
         await prisma.$disconnect();
     }
 }
 
-seedCategories();
+main();
+

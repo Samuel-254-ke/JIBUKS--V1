@@ -50,9 +50,24 @@ export default function AddExpenseScreen() {
         apiService.getPaymentMethods()
       ]);
 
+      console.log('📊 Loaded categories:', allCategories);
+      console.log('💳 Loaded payment methods:', methods);
+
       // Filter for expense categories
-      const expenseCats = allCategories.filter((c: any) => c.type?.toLowerCase() === 'expense');
-      setCategories(expenseCats);
+      const expenseCats = allCategories.filter((c: any) => 
+        c.type && c.type.toLowerCase() === 'expense'
+      );
+      
+      console.log('💸 Expense categories found:', expenseCats.length);
+      
+      // Fallback if no expense categories
+      if (expenseCats.length === 0) {
+        console.warn('⚠️ No expense categories, using fallback');
+        setCategories(allCategories.slice(0, 8));
+      } else {
+        setCategories(expenseCats);
+      }
+      
       setPaymentMethods(methods);
     } catch (error) {
       console.error('Failed to load data:', error);

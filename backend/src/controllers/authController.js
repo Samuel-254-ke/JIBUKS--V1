@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { generateToken, generateRefreshToken, JWT_SECRET } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../services/emailService.js';
-import { seedFamilyCoA } from '../services/accountingService.js';
+import { seedFamilyCoA, seedFamilyCategories, seedFamilyPaymentMethods } from '../services/accountingService.js';
 import crypto from 'crypto';
 
 const SALT_ROUNDS = 10;
@@ -104,6 +104,24 @@ async function register(req, res, next) {
       } catch (coaError) {
         console.error('[Auth] Failed to seed CoA:', coaError);
         // Don't fail registration if CoA seeding fails
+      }
+
+      // Seed Categories for the new family
+      try {
+        await seedFamilyCategories(tenant.id);
+        console.log(`[Auth] Seeded categories for new family tenant ${tenant.id}`);
+      } catch (catError) {
+        console.error('[Auth] Failed to seed categories:', catError);
+        // Don't fail registration if category seeding fails
+      }
+
+      // Seed Payment Methods for the new family
+      try {
+        await seedFamilyPaymentMethods(tenant.id);
+        console.log(`[Auth] Seeded payment methods for new family tenant ${tenant.id}`);
+      } catch (pmError) {
+        console.error('[Auth] Failed to seed payment methods:', pmError);
+        // Don't fail registration if payment method seeding fails
       }
     }
 

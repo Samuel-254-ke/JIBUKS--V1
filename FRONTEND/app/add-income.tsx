@@ -49,9 +49,24 @@ export default function AddIncomeScreen() {
         apiService.getPaymentMethods()
       ]);
 
+      console.log('📊 Loaded categories:', allCategories);
+      console.log('💳 Loaded payment methods:', methods);
+
       // Filter for income categories
-      const incomeCats = allCategories.filter((c: any) => c.type?.toLowerCase() === 'income');
-      setCategories(incomeCats);
+      const incomeCats = allCategories.filter((c: any) => 
+        c.type && c.type.toLowerCase() === 'income'
+      );
+      
+      console.log('💰 Income categories found:', incomeCats.length);
+      
+      // Fallback if no income categories
+      if (incomeCats.length === 0) {
+        console.warn('⚠️ No income categories, using fallback');
+        setCategories(allCategories.slice(0, 6));
+      } else {
+        setCategories(incomeCats);
+      }
+      
       setPaymentMethods(methods);
     } catch (error) {
       console.error('Failed to load data:', error);

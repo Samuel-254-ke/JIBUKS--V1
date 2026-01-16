@@ -155,6 +155,133 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
 }
 
 // ============================================
+// CATEGORY TEMPLATE
+// ============================================
+
+/**
+ * Standard Family Categories Template
+ * These categories map to the Chart of Accounts
+ */
+const FAMILY_CATEGORIES_TEMPLATE = [
+    // Income Categories
+    { name: 'Salary', type: 'income', icon: '💼', color: '#10B981' },
+    { name: 'Business', type: 'income', icon: '🏢', color: '#3B82F6' },
+    { name: 'Investment', type: 'income', icon: '📈', color: '#8B5CF6' },
+    { name: 'Gift', type: 'income', icon: '🎁', color: '#EC4899' },
+    { name: 'Rental', type: 'income', icon: '🏠', color: '#F59E0B' },
+    { name: 'Other Income', type: 'income', icon: '💰', color: '#6EE7B7' },
+
+    // Expense Categories
+    { name: 'Food', type: 'expense', icon: '🍔', color: '#EF4444' },
+    { name: 'Transport', type: 'expense', icon: '🚗', color: '#F97316' },
+    { name: 'Housing', type: 'expense', icon: '🏡', color: '#84CC16' },
+    { name: 'Utilities', type: 'expense', icon: '💡', color: '#14B8A6' },
+    { name: 'Healthcare', type: 'expense', icon: '🏥', color: '#06B6D4' },
+    { name: 'Education', type: 'expense', icon: '📚', color: '#3B82F6' },
+    { name: 'Entertainment', type: 'expense', icon: '🎬', color: '#8B5CF6' },
+    { name: 'Shopping', type: 'expense', icon: '🛍️', color: '#EC4899' },
+    { name: 'Communication', type: 'expense', icon: '📱', color: '#F43F5E' },
+    { name: 'Insurance', type: 'expense', icon: '🛡️', color: '#64748B' },
+    { name: 'Donations', type: 'expense', icon: '🤝', color: '#10B981' },
+    { name: 'Other Expenses', type: 'expense', icon: '📦', color: '#6B7280' },
+];
+
+/**
+ * Seeds categories for a new family tenant
+ * Called automatically when a new family is created
+ * 
+ * @param {number} tenantId - The tenant ID to seed categories for
+ */
+export async function seedFamilyCategories(tenantId) {
+    try {
+        // Check if categories already exist
+        const existingCategories = await prisma.category.count({
+            where: { tenantId }
+        });
+
+        if (existingCategories > 0) {
+            console.log(`[AccountingService] Tenant ${tenantId} already has ${existingCategories} categories, skipping seed`);
+            return;
+        }
+
+        // Create all categories from template
+        const categoriesToCreate = FAMILY_CATEGORIES_TEMPLATE.map(cat => ({
+            tenantId,
+            name: cat.name,
+            type: cat.type,
+            icon: cat.icon,
+            color: cat.color,
+        }));
+
+        await prisma.category.createMany({
+            data: categoriesToCreate,
+        });
+
+        console.log(`[AccountingService] Seeded ${categoriesToCreate.length} categories for tenant ${tenantId}`);
+
+        return categoriesToCreate.length;
+    } catch (error) {
+        console.error('[AccountingService] Error seeding categories:', error);
+        throw error;
+    }
+}
+
+// ============================================
+// PAYMENT METHODS TEMPLATE
+// ============================================
+
+/**
+ * Standard Family Payment Methods Template
+ */
+const FAMILY_PAYMENT_METHODS_TEMPLATE = [
+    { name: 'Cash', type: 'cash', details: { description: 'Physical cash payments' } },
+    { name: 'M-Pesa', type: 'mobile_money', details: { provider: 'Safaricom' } },
+    { name: 'Bank Transfer', type: 'bank', details: { description: 'Direct bank transfers' } },
+    { name: 'Credit Card', type: 'card', details: { cardType: 'credit' } },
+    { name: 'Debit Card', type: 'card', details: { cardType: 'debit' } },
+];
+
+/**
+ * Seeds payment methods for a new family tenant
+ * Called automatically when a new family is created
+ * 
+ * @param {number} tenantId - The tenant ID to seed payment methods for
+ */
+export async function seedFamilyPaymentMethods(tenantId) {
+    try {
+        // Check if payment methods already exist
+        const existingPaymentMethods = await prisma.paymentMethod.count({
+            where: { tenantId }
+        });
+
+        if (existingPaymentMethods > 0) {
+            console.log(`[AccountingService] Tenant ${tenantId} already has ${existingPaymentMethods} payment methods, skipping seed`);
+            return;
+        }
+
+        // Create all payment methods from template
+        const paymentMethodsToCreate = FAMILY_PAYMENT_METHODS_TEMPLATE.map(pm => ({
+            tenantId,
+            name: pm.name,
+            type: pm.type,
+            details: pm.details,
+            isActive: true,
+        }));
+
+        await prisma.paymentMethod.createMany({
+            data: paymentMethodsToCreate,
+        });
+
+        console.log(`[AccountingService] Seeded ${paymentMethodsToCreate.length} payment methods for tenant ${tenantId}`);
+
+        return paymentMethodsToCreate.length;
+    } catch (error) {
+        console.error('[AccountingService] Error seeding payment methods:', error);
+        throw error;
+    }
+}
+
+// ============================================
 // ACCOUNT MAPPING SERVICE
 // ============================================
 
@@ -753,10 +880,12 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
 }
 
 // Named exports for constants
-export { FAMILY_COA_TEMPLATE, CATEGORY_ACCOUNT_MAP };
+export { FAMILY_COA_TEMPLATE, FAMILY_CATEGORIES_TEMPLATE, FAMILY_PAYMENT_METHODS_TEMPLATE, CATEGORY_ACCOUNT_MAP };
 
 export default {
     seedFamilyCoA,
+    seedFamilyCategories,
+    seedFamilyPaymentMethods,
     getAccountMapping,
     resolveAccountIds,
     createJournalEntry,
@@ -768,5 +897,7 @@ export default {
     getCashFlow,
     getBalanceSheet,
     FAMILY_COA_TEMPLATE,
+    FAMILY_CATEGORIES_TEMPLATE,
+    FAMILY_PAYMENT_METHODS_TEMPLATE,
     CATEGORY_ACCOUNT_MAP,
 };
