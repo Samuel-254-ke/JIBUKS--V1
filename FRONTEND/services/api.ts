@@ -807,13 +807,10 @@ class ApiService {
     }
     const suffix = query.toString() ? `?${query.toString()}` : '';
 
-    try {
-      return await this.request<Account[]>(`/accounts${suffix}`);
-    } catch (error) {
-      // Backend not ready - return mock accounts
-      console.warn('⚠️ Accounts API not available, returning mock accounts');
-      return this.mockAccounts;
-    }
+    console.log('📊 Fetching accounts from backend:', `/accounts${suffix}`);
+    const accounts = await this.request<Account[]>(`/accounts${suffix}`);
+    console.log('✅ Accounts loaded from database:', accounts.length);
+    return accounts;
   }
 
   async getAccount(accountId: string): Promise<Account> {

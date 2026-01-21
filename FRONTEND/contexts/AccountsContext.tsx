@@ -20,12 +20,24 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('🔄 Loading accounts from database...');
+      
       // Fetch accounts with balances from backend
       const data = await apiService.listAccounts({ includeBalances: true });
+      
+      console.log('✅ Accounts loaded successfully:', {
+        count: data?.length || 0,
+        types: [...new Set((data || []).map(a => a.type))],
+        sample: (data || []).slice(0, 3).map(a => ({ code: a.code, name: a.name, id: a.id }))
+      });
+      
       setAccounts(data || []);
+      
     } catch (err: any) {
-      console.error('Error loading accounts:', err);
-      setError(err?.message || 'Failed to load accounts');
+      console.error('❌ Error loading accounts:', err);
+      const errorMsg = err?.error || err?.message || 'Failed to load accounts from server';
+      setError(errorMsg);
       setAccounts([]); // Empty accounts on error
     } finally {
       setLoading(false);

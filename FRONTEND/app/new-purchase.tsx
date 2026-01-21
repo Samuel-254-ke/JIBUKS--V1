@@ -8,7 +8,9 @@ import {
     TextInput,
     Alert,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -38,16 +40,35 @@ export default function NewPurchaseScreen() {
 
     const loadData = async () => {
         try {
+            setLoading(true);
             const [vendorsData, accountsData] = await Promise.all([
                 apiService.request('/vendors'),
                 apiService.request('/accounts')
             ]);
-            setVendors(vendorsData);
+            
+            console.log('✅ Vendors loaded:', vendorsData?.length || 0);
+            console.log('✅ Accounts loaded:', accountsData?.length || 0);
+            
+            setVendors(vendorsData || []);
             // Filter for expense accounts
-            setAccounts(accountsData.filter(a => a.type === 'EXPENSE' || a.type === 'ASSET'));
+            setAccounts(accountsData?.filter(a => a.type === 'EXPENSE' || a.type === 'ASSET') || []);
+            
+            // Show warning if no vendors
+            if (!vendorsData || vendorsData.length === 0) {
+                Alert.alert(
+                    'No Vendors Found',
+                    'You need to create a vendor first. Would you like to create one now?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Create Vendor', onPress: () => router.push('/vendors') }
+                    ]
+                );
+            }
         } catch (error) {
-            console.error('Error loading data:', error);
-            Alert.alert('Error', 'Failed to load vendors and accounts');
+            console.error('❌ Error loading data:', error);
+            Alert.alert('Error', `Failed to load data: ${error.message || 'Unknown error'}`);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -92,14 +113,31 @@ export default function NewPurchaseScreen() {
             return;
         }
 
+        // Check each item for missing fields
+        const invalidItems = items.map((item, index) => {
+            const errors = [];
+            if (!item.description) errors.push('description');
+            if (!item.quantity) errors.push('quantity');
+            if (!item.unitPrice) errors.push('unit price');
+            if (!item.accountId) errors.push('account');
+            
+            if (errors.length > 0) {
+                return { index: index + 1, errors };
+            }
+            return null;
+        }).filter(Boolean);
+
+        if (invalidItems.length > 0) {
+            const errorMessages = invalidItems.map(item => 
+                `Item ${item.index}: Missing ${item.errors.join(', ')}`
+            ).join('\n');
+            Alert.alert('Incomplete Items', errorMessages);
+            return;
+        }
+
         const validItems = items.filter(item =>
             item.description && item.quantity && item.unitPrice && item.accountId
         );
-
-        if (validItems.length === 0) {
-            Alert.alert('Error', 'Please add at least one valid item');
-            return;
-        }
 
         try {
             setLoading(true);
@@ -109,17 +147,28 @@ export default function NewPurchaseScreen() {
                 billNumber: billNumber || undefined,
                 purchaseDate,
                 dueDate: dueDate || undefined,
-                items: validItems.map(item => ({
-                    description: item.description,
-                    quantity: parseFloat(item.quantity),
-                    unitPrice: parseFloat(item.unitPrice),
-                    accountId: parseInt(item.accountId)
-                })),
+                items: validItems.map(item => {
+                    // Parse accountId - if it's a mock string ID, parseInt will return NaN
+                    const accountId = parseInt(item.accountId);
+                    if (isNaN(accountId)) {
+                        throw new Error(`Invalid account ID: ${item.accountId}. Please make sure you're logged in and accounts are loaded from the backend.`);
+                    }
+                    
+                    return {
+                        description: item.description,
+                        quantity: parseFloat(item.quantity),
+                        unitPrice: parseFloat(item.unitPrice),
+                        accountId
+                    };
+                }),
                 tax: parseFloat(tax) || 0,
                 discount: parseFloat(discount) || 0,
                 notes: notes || undefined,
                 status: 'UNPAID'
             };
+
+            console.log('📦 Submitting purchase:', JSON.stringify(purchaseData, null, 2));
+            console.log('📋 Valid items:', validItems);
 
             await apiService.request('/purchases', {
                 method: 'POST',
@@ -151,23 +200,36 @@ export default function NewPurchaseScreen() {
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* Vendor Selection */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Vendor Information</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Vendor Information</Text>
+                        {vendors.length === 0 && (
+                            <TouchableOpacity 
+                                onPress={() => router.push('/vendors')} 
+                                style={styles.addVendorButton}
+                            >
+                                <Ionicons name="add" size={18} color="#2563eb" />
+                                <Text style={styles.addVendorText}>Add Vendor</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
 
                     <Text style={styles.label}>Vendor *</Text>
                     <View style={styles.pickerContainer}>
                         <Ionicons name="person-outline" size={20} color="#6b7280" />
-                        <select
-                            value={vendorId}
-                            onChange={(e) => setVendorId(e.target.value)}
+                        <Picker
+                            selectedValue={vendorId}
+                            onValueChange={(value) => setVendorId(value)}
                             style={styles.picker}
                         >
-                            <option value="">Select Vendor</option>
+                            <Picker.Item label="Select Vendor" value="" />
                             {vendors.map(vendor => (
-                                <option key={vendor.id} value={vendor.id}>
-                                    {vendor.name}
-                                </option>
+                                <Picker.Item 
+                                    key={vendor.id} 
+                                    label={vendor.name} 
+                                    value={vendor.id.toString()} 
+                                />
                             ))}
-                        </select>
+                        </Picker>
                     </View>
 
                     <Text style={styles.label}>Bill Number</Text>
@@ -243,18 +305,20 @@ export default function NewPurchaseScreen() {
                             <Text style={styles.label}>Account *</Text>
                             <View style={styles.pickerContainer}>
                                 <Ionicons name="folder-outline" size={20} color="#6b7280" />
-                                <select
-                                    value={item.accountId}
-                                    onChange={(e) => updateItem(index, 'accountId', e.target.value)}
+                                <Picker
+                                    selectedValue={item.accountId}
+                                    onValueChange={(value) => updateItem(index, 'accountId', value)}
                                     style={styles.picker}
                                 >
-                                    <option value="">Select Account</option>
+                                    <Picker.Item label="Select Account" value="" />
                                     {accounts.map(account => (
-                                        <option key={account.id} value={account.id}>
-                                            {account.code} - {account.name}
-                                        </option>
+                                        <Picker.Item 
+                                            key={account.id} 
+                                            label={`${account.code} - ${account.name}`} 
+                                            value={account.id.toString()} 
+                                        />
                                     ))}
-                                </select>
+                                </Picker>
                             </View>
 
                             <View style={styles.row}>
@@ -595,5 +659,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: '#fff',
+    },
+    addVendorButton: {
+        backgroundColor: '#10b981',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        marginLeft: 8,
+    },
+    addVendorText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
