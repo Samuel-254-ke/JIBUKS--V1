@@ -1,386 +1,273 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   SafeAreaView,
-  ActivityIndicator,
-  RefreshControl,
+  Platform,
+  StatusBar,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import apiService from '@/services/api';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '@/contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [dashboardData, setDashboardData] = useState<any>(null);
-  const [userName, setUserName] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuth();
+  const [greeting, setGreeting] = useState('Good Morning');
 
   useEffect(() => {
-    loadDashboardData();
-    loadUserData();
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 18) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
   }, []);
 
-  const loadUserData = async () => {
-    try {
-      const user = await apiService.getCurrentUser();
-      if (user && user.name) {
-        setUserName(user.name);
-      }
-    } catch (error) {
-      console.error('Error loading user:', error);
-    }
-  };
-
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const data = await apiService.getDashboard();
-
-      // Transform the data to match the component's expected format
-      const transformedData = {
-        familyName: data.familyMembers?.[0]?.name || 'Your Family',
-        totalMembers: data.familyMembers?.length || 0,
-        activeGoals: data.goals?.length || 0,
-        monthlySpending: Number(data.summary?.totalExpenses) || 0,
-        recentGoals: data.goals?.slice(0, 3).map((g: any) => ({
-          id: g.id,
-          name: g.name,
-          current: Number(g.currentAmount),
-          target: Number(g.targetAmount),
-          deadline: g.targetDate ? new Date(g.targetDate).toLocaleDateString() : 'No deadline'
-        })) || [],
-        recentTransactions: data.recentTransactions?.slice(0, 4).map((t: any) => ({
-          id: t.id,
-          name: t.description || t.category,
-          amount: Number(t.amount),
-          time: new Date(t.date).toLocaleDateString(),
-          category: t.category,
-          type: t.type.toLowerCase()
-        })) || [],
-        summary: data.summary || { totalIncome: 0, totalExpenses: 0, balance: 0 }
-      };
-
-      setDashboardData(transformedData);
-    } catch (error: any) {
-      // If user has no family, redirect to family setup
-      if (error.error === 'User is not part of any family' ||
-        error.error === 'Not part of a family') {
-        console.log('No family found - redirecting to family setup');
-        try {
-          (router.replace as any)('/family-setup');
-        } catch (navError) {
-          console.error('Navigation error:', navError);
-        }
-      } else {
-        console.error('Error loading dashboard:', error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadDashboardData();
-    await loadUserData();
-    setRefreshing(false);
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f59e0b" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!dashboardData) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={64} color="#ef4444" />
-          <Text style={styles.errorText}>Failed to load dashboard</Text>
-          <TouchableOpacity onPress={loadDashboardData} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const formatCurrency = (amount: number) => {
-    return `KES ${amount.toLocaleString()}`;
-  };
+  // Mock Data
+  const recentActivities = [
+    { id: 1, title: 'Cheque #204 Cleared', date: 'Today, 10:23 AM', type: 'success', amount: 'KES 500' },
+    { id: 2, title: 'New Supplier Added', date: 'Yesterday, 4:15 PM', type: 'info', amount: '' },
+    { id: 3, title: 'Rent Payment Pending', date: 'Jan 10, 2026', type: 'warning', amount: 'KES 25,000' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>JIBUKS</Text>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="notifications-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => router.push('/family-settings' as any)}
-          >
-            <Ionicons name="settings-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <StatusBar barStyle="light-content" backgroundColor="#122f8a" />
 
+      {/* Scrollable Content */}
       <ScrollView
-        style={styles.scrollView}
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
       >
-        {/* Financial Summary Cards */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryRow}>
-            {/* Cash on Hand */}
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryCardHeader}>
-                <Ionicons name="cash-outline" size={20} color="#fe9900" />
-                <Text style={styles.summaryCardTitle}>Cash on hand</Text>
+        {/* Creative Header Section */}
+        <View style={styles.headerContainer}>
+          <LinearGradient
+            colors={['#122f8a', '#0a1a5c']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.header}
+          >
+            {/* Decorative Background Circles */}
+            <View style={styles.circle1} />
+            <View style={styles.circle2} />
+
+            {/* Top Bar: Greeting & Notification */}
+            <View style={styles.headerTop}>
+              <View>
+                <Text style={styles.greetingText}>{greeting},</Text>
+                <Text style={styles.userName}>{user?.name || 'Valued Member'}</Text>
               </View>
-              <Text style={styles.summaryCardAmount}>
-                {formatCurrency(dashboardData.summary?.balance || 0)}
-              </Text>
-            </View>
-
-            {/* Income MTD */}
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryCardHeader}>
-                <Ionicons name="trending-up-outline" size={20} color="#10b981" />
-                <Text style={styles.summaryCardTitle}>Income (MTD)</Text>
-              </View>
-              <Text style={styles.summaryCardAmount}>
-                {formatCurrency(dashboardData.summary?.totalIncome || 0)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryRow}>
-            {/* Expenses MTD */}
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryCardHeader}>
-                <Ionicons name="trending-down-outline" size={20} color="#ef4444" />
-                <Text style={styles.summaryCardTitle}>Expenses (MTD)</Text>
-              </View>
-              <Text style={styles.summaryCardAmount}>
-                {formatCurrency(dashboardData.summary?.totalExpenses || 0)}
-              </Text>
-            </View>
-
-            {/* Net Balance */}
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryCardHeader}>
-                <Ionicons name="wallet-outline" size={20} color="#122f8a" />
-                <Text style={styles.summaryCardTitle}>Net Balance</Text>
-              </View>
-              <Text style={styles.summaryCardAmount}>
-                {formatCurrency((dashboardData.summary?.totalIncome || 0) - (dashboardData.summary?.totalExpenses || 0))}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="flash" size={20} color="#fe9900" />
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-          </View>
-
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push('/purchases' as any)}
-            >
-              <Ionicons name="cart" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Purchase</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionOrange]}
-              onPress={() => router.push('/cheques' as any)}
-            >
-              <Ionicons name="card" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Cheque</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push('/banking' as any)}
-            >
-              <Ionicons name="arrow-down-circle" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Deposit</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionOrange]}
-              onPress={() => router.push('/add-expense' as any)}
-            >
-              <Ionicons name="document-text" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Bill</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push('/vendors' as any)}
-            >
-              <Ionicons name="business" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Supplier</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionOrange]}
-              onPress={() => router.push('/purchases' as any)}
-            >
-              <Ionicons name="receipt" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Receipt</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push('/income' as any)}
-            >
-              <Ionicons name="trending-up" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Income</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionOrange]}
-              onPress={() => router.push('/expenses' as any)}
-            >
-              <Ionicons name="trending-down" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Expense</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push('/banking' as any)}
-            >
-              <Ionicons name="swap-horizontal" size={18} color="#ffffff" />
-              <Text style={styles.quickActionText}>Transfer</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Upcoming Bills */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="calendar-outline" size={20} color="#fe9900" />
-            <Text style={styles.sectionTitle}>Upcoming Bills</Text>
-          </View>
-
-          <View style={styles.billsCard}>
-            <View style={styles.billItem}>
-              <View style={styles.billLeft}>
-                <Text style={styles.billBullet}>•</Text>
-                <Text style={styles.billText}>Rent - Jan 25</Text>
-              </View>
-              <TouchableOpacity style={styles.payButton}>
-                <Text style={styles.payButtonText}>Pay Now</Text>
+              <TouchableOpacity style={styles.notificationBtn}>
+                <Ionicons name="notifications-outline" size={24} color="#ffffff" />
+                <View style={styles.notificationBadge} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.billItem}>
-              <View style={styles.billLeft}>
-                <Text style={styles.billBullet}>•</Text>
-                <Text style={styles.billText}>Electricity - Jan 25</Text>
+            {/* Creative Financial Dashboard Card */}
+            <View style={styles.financialCard}>
+
+              {/* Main Balance */}
+              <View style={styles.mainBalanceSection}>
+                <Text style={styles.balanceLabel}>NET BALANCE</Text>
+                <Text style={styles.balanceAmount}>KES 45,000</Text>
               </View>
-              <Text style={styles.billStatus}>AutoPay</Text>
-            </View>
 
-            <View style={styles.billItem}>
-              <View style={styles.billLeft}>
-                <Text style={styles.billBullet}>•</Text>
-                <Text style={styles.billText}>Water - Jan 18</Text>
-              </View>
-              <Text style={styles.billStatus}>Mark Paid</Text>
-            </View>
+              <View style={styles.divider} />
 
-            <View style={styles.billItem}>
-              <View style={styles.billLeft}>
-                <Text style={styles.billBullet}>•</Text>
-                <Text style={styles.billText}>School Fees - Feb 5</Text>
-              </View>
-              <TouchableOpacity style={styles.payButton}>
-                <Text style={styles.payButtonText}>Pay</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Recent Transactions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="time-outline" size={20} color="#fe9900" />
-            <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          </View>
-
-          <View style={styles.transactionsCard}>
-            {dashboardData.recentTransactions && dashboardData.recentTransactions.length > 0 ? (
-              dashboardData.recentTransactions.map((transaction: any) => (
-                <View key={transaction.id} style={styles.transactionItem}>
-                  <View style={styles.transactionLeft}>
-                    <Text style={styles.transactionBullet}>•</Text>
-                    <View>
-                      <Text style={styles.transactionName}>{transaction.name}</Text>
-                      <Text style={styles.transactionCategory}>
-                        {formatCurrency(transaction.amount)} ({transaction.category})
-                      </Text>
-                    </View>
+              {/* Three-Column Stats Grid */}
+              <View style={styles.statsGrid}>
+                {/* Money In */}
+                <View style={styles.statItem}>
+                  <View style={[styles.statIcon, { backgroundColor: '#dcfce7' }]}>
+                    <Ionicons name="arrow-down" size={14} color="#15803d" />
+                  </View>
+                  <View>
+                    <Text style={styles.statLabel}>Money In</Text>
+                    <Text style={styles.statValue}>1.5M</Text>
                   </View>
                 </View>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>No recent transactions</Text>
-            )}
-          </View>
-        </View>
 
-        {/* Suppliers Section */}
-        <View style={styles.section}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Ionicons name="business" size={18} color="#122f8a" />
-              <Text style={styles.infoText}>
-                <Text style={styles.infoLabel}>Suppliers:</Text> Water | Electricity | School | Supermarket
-              </Text>
+                <View style={styles.verticalDivider} />
+
+                {/* Money Out */}
+                <View style={styles.statItem}>
+                  <View style={[styles.statIcon, { backgroundColor: '#fee2e2' }]}>
+                    <Ionicons name="arrow-up" size={14} color="#ef4444" />
+                  </View>
+                  <View>
+                    <Text style={styles.statLabel}>Money Out</Text>
+                    <Text style={styles.statValue}>320k</Text>
+                  </View>
+                </View>
+
+                <View style={styles.verticalDivider} />
+
+                {/* Cash */}
+                <View style={styles.statItem}>
+                  <View style={[styles.statIcon, { backgroundColor: '#e0f2fe' }]}>
+                    <Ionicons name="wallet" size={14} color="#0284c7" />
+                  </View>
+                  <View>
+                    <Text style={styles.statLabel}>Cash</Text>
+                    <Text style={styles.statValue}>45k</Text>
+                  </View>
+                </View>
+              </View>
             </View>
+          </LinearGradient>
+        </View>
+
+        {/* Quick Actions Grid */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.actionsGrid}>
+
+            {/* 1. Purchase */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/new-purchase')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#f3e8ff' }]}>
+                <Ionicons name="cart" size={24} color="#7c3aed" />
+              </View>
+              <Text style={styles.actionLabel}>Purchase</Text>
+            </TouchableOpacity>
+
+            {/* 2. Expense */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/add-expense')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#fff7ed' }]}>
+                <Ionicons name="receipt-outline" size={24} color="#ea580c" />
+              </View>
+              <Text style={styles.actionLabel}>Expense</Text>
+            </TouchableOpacity>
+
+            {/* 3. Enter Bill */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/new-purchase')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#fff7ed' }]}>
+                <Ionicons name="document-text" size={24} color="#d97706" />
+              </View>
+              <Text style={styles.actionLabel}>Enter Bill</Text>
+            </TouchableOpacity>
+
+            {/* 4. Supplier */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/analytics')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#e0e7ff' }]}>
+                <Ionicons name="people" size={24} color="#4338ca" />
+              </View>
+              <Text style={styles.actionLabel}>Supplier</Text>
+            </TouchableOpacity>
+
+            {/* 5. Cheque */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/transactions')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#f0f9ff' }]}>
+                <Ionicons name="wallet" size={24} color="#0284c7" />
+              </View>
+              <Text style={styles.actionLabel}>Cheque</Text>
+            </TouchableOpacity>
+
+            {/* 6. Deposit */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/deposit-cheque')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#ecfdf5' }]}>
+                <Ionicons name="arrow-down-circle" size={24} color="#059669" />
+              </View>
+              <Text style={styles.actionLabel}>Deposit</Text>
+            </TouchableOpacity>
+
+            {/* 7. Income */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/add-income')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#dcfce7' }]}>
+                <Ionicons name="cash" size={24} color="#15803d" />
+              </View>
+              <Text style={styles.actionLabel}>Income</Text>
+            </TouchableOpacity>
+
+            {/* 8. Transfer */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/banking')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#cffafe' }]}>
+                <Ionicons name="swap-horizontal" size={24} color="#0891b2" />
+              </View>
+              <Text style={styles.actionLabel}>Transfer</Text>
+            </TouchableOpacity>
+
+            {/* 9. Receipt Upload */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/add-expense')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#ffe4e6' }]}>
+                <Ionicons name="camera" size={24} color="#e11d48" />
+              </View>
+              <Text style={styles.actionLabel}>Receipt Upload</Text>
+            </TouchableOpacity>
+
+            {/* 10. Add Asset */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/household-assets')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#f1f5f9' }]}>
+                <Ionicons name="add-circle" size={24} color="#475569" />
+              </View>
+              <Text style={styles.actionLabel}>Add Asset</Text>
+            </TouchableOpacity>
+
+            {/* 11. Reports */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/community')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#f1f5f9' }]}>
+                <Ionicons name="stats-chart" size={24} color="#475569" />
+              </View>
+              <Text style={styles.actionLabel}>Reports</Text>
+            </TouchableOpacity>
+
           </View>
         </View>
 
-        {/* Cheques Section */}
-        <View style={styles.section}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Ionicons name="wallet" size={18} color="#fe9900" />
-              <Text style={styles.infoText}>
-                <Text style={styles.infoLabel}>Cheques:</Text> Pending 2 | Cleared 5 | Deposited 1 | Returned 0
-              </Text>
-            </View>
+
+        {/* Recent Activity */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Recent</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>Show All</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.activityList}>
+            {recentActivities.map((item, index) => (
+              <View key={item.id}>
+                <TouchableOpacity style={styles.activityItem}>
+                  <View style={[
+                    styles.activityIcon,
+                    item.type === 'success' ? { backgroundColor: '#dcfce7' } :
+                      item.type === 'warning' ? { backgroundColor: '#fef3c7' } :
+                        { backgroundColor: '#e0f2fe' }
+                  ]}>
+                    <Ionicons
+                      name={
+                        item.type === 'success' ? 'checkmark' :
+                          item.type === 'warning' ? 'time' : 'information'
+                      }
+                      size={20}
+                      color={
+                        item.type === 'success' ? '#15803d' :
+                          item.type === 'warning' ? '#b45309' : '#0369a1'
+                      }
+                    />
+                  </View>
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityTitle}>{item.title}</Text>
+                    <Text style={styles.activityDate}>{item.date}</Text>
+                  </View>
+                  {item.amount ? (
+                    <Text style={styles.activityAmount}>{item.amount}</Text>
+                  ) : null}
+                </TouchableOpacity>
+                {index < recentActivities.length - 1 && <View style={styles.separator} />}
+              </View>
+            ))}
           </View>
         </View>
 
-        {/* Bottom Spacing for Tab Bar */}
-        <View style={{ height: 100 }} />
+        {/* Extra Height for Tab Bar */}
+        <View style={{ height: 80 }} />
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -389,294 +276,253 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: '#f8fafc',
   },
-  loadingContainer: {
+  content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
   },
-  loadingText: {
-    marginTop: 16,
-    color: '#6b7280',
-    fontSize: 16,
+  scrollContent: {
+    paddingBottom: 20,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-  },
-  errorText: {
-    marginTop: 16,
-    color: '#6b7280',
-    fontSize: 16,
-  },
-  retryButton: {
-    marginTop: 16,
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+  headerContainer: {
+    marginBottom: 20,
+    overflow: 'hidden',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   header: {
+    paddingTop: Platform.OS === 'android' ? 60 : 60,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    position: 'relative',
+  },
+  circle1: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  circle2: {
+    position: 'absolute',
+    bottom: -50,
+    left: -20,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#122f8a',
-    borderBottomWidth: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 5,
+    marginBottom: 24,
+    zIndex: 10,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  headerIcons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  summarySection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  summaryCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 12,
-    width: '48%',
-    minWidth: 150,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  summaryCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  summaryCardTitle: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginLeft: 6,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summaryCardAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginTop: 4,
-  },
-  section: {
-    paddingHorizontal: 16,
-    marginTop: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    paddingBottom: 8,
-  },
-  sectionTitle: {
+  greetingText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#122f8a',
-    marginLeft: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  quickActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#122f8a',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-    shadowColor: '#122f8a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-    minWidth: 95,
-  },
-  quickActionOrange: {
-    backgroundColor: '#fe9900',
-    shadowColor: '#fe9900',
-  },
-  quickActionText: {
-    fontSize: 13,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  billsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  billItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  billLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  billBullet: {
-    fontSize: 20,
-    color: '#1f2937',
-    marginRight: 8,
-  },
-  billText: {
-    fontSize: 14,
-    color: '#1f2937',
-  },
-  payButton: {
-    backgroundColor: '#fe9900',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 6,
-    shadowColor: '#fe9900',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  payButtonText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  billStatus: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  transactionsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  transactionItem: {
-    paddingVertical: 8,
-  },
-  transactionLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  transactionBullet: {
-    fontSize: 20,
-    color: '#1f2937',
-    marginRight: 8,
-  },
-  transactionName: {
-    fontSize: 14,
-    color: '#1f2937',
+    color: 'rgba(255,255,255,0.9)',
     fontWeight: '500',
   },
-  transactionCategory: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
+  userName: {
+    fontSize: 24,
+    color: '#ffffff',
+    fontWeight: 'bold',
   },
-  emptyText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    padding: 20,
-  },
-  infoCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 14,
+  notificationBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  infoRow: {
+  notificationBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fe9900',
+    borderWidth: 1,
+    borderColor: '#ffffff',
+  },
+  financialCard: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+  },
+  mainBalanceSection: {
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  balanceLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    fontWeight: '600',
+  },
+  balanceAmount: {
+    fontSize: 32,
+    color: '#ffffff',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginBottom: 20,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statItem: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'flex-start',
   },
-  infoText: {
-    fontSize: 13,
-    color: '#1f2937',
-    flex: 1,
-    lineHeight: 20,
+  statIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  infoLabel: {
+  statLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 15,
     fontWeight: '700',
+    color: '#ffffff',
+  },
+  verticalDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginHorizontal: 12,
+  },
+  sectionContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    letterSpacing: 0.5,
+  },
+  seeAllText: {
+    fontSize: 13,
     color: '#122f8a',
+    fontWeight: '600',
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  actionCard: {
+    width: '31%', // 3 Columns
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: 12,
+  },
+  actionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+    textAlign: 'center',
+  },
+  activityList: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 8,
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  activityIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  activityDate: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  activityAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginLeft: 74,
   },
 });
