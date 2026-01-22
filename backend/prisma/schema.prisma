@@ -383,6 +383,7 @@ model Purchase {
   total           Decimal
   amountPaid      Decimal          @default(0) @map("amount_paid")
   notes           String?
+  attachmentUrl   String?          @map("attachment_url")
   journalId       Int?             @map("journal_id")
   createdById     Int              @map("created_by_id")
   createdAt       DateTime         @default(now()) @map("created_at")

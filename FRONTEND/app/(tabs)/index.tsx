@@ -145,7 +145,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             {/* 3. Enter Bill */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/new-purchase')}>
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/bill-entry' as any)}>
               <View style={[styles.actionIcon, { backgroundColor: '#fff7ed' }]}>
                 <Ionicons name="document-text" size={24} color="#d97706" />
               </View>

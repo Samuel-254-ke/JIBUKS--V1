@@ -1,6 +1,7 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
 import { verifyJWT } from '../middleware/auth.js';
+import { upload } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -160,31 +161,51 @@ router.get('/:id', async (req, res) => {
  * POST /api/purchases
  * Create a new purchase with double-entry accounting
  */
-router.post('/', async (req, res) => {
+router.post('/', upload.single('attachment'), async (req, res) => {
     try {
         const { tenantId, id: userId } = req.user;
-        const {
+        let {
             vendorId,
             billNumber,
             purchaseDate,
             dueDate,
             items,
-            tax = 0,
-            discount = 0,
+            tax,
+            discount,
             notes,
-            status = 'UNPAID'
+            status
         } = req.body;
+
+        // Handle file upload
+        let attachmentUrl = null;
+        if (req.file) {
+            attachmentUrl = `/uploads/${req.file.filename}`;
+        }
 
         if (!tenantId) {
             return res.status(400).json({ error: 'User is not part of any family' });
         }
 
-        if (!items || items.length === 0) {
+        // Parse items if string (FormData)
+        if (typeof items === 'string') {
+            try {
+                items = JSON.parse(items);
+            } catch (e) {
+                return res.status(400).json({ error: 'Invalid items format' });
+            }
+        }
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ error: 'Purchase must have at least one item' });
         }
 
+        // Parse numeric fields if string (FormData)
+        tax = tax ? Number(tax) : 0;
+        discount = discount ? Number(discount) : 0;
+        status = status || 'UNPAID';
+
         // Calculate totals
-        const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+        const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
         const total = subtotal + tax - discount;
 
         // Get Accounts Payable account
@@ -204,6 +225,31 @@ router.post('/', async (req, res) => {
 
         // Create purchase with journal entry in a transaction
         const result = await prisma.$transaction(async (tx) => {
+            // 0. Resolve Account Codes to IDs (Fix for acct-CODE format)
+            // Frontend sends cleaned codes (e.g. 5000), we need real DB IDs
+            for (const item of items) {
+                if (item.accountId) {
+                    const identifier = String(item.accountId);
+                    // Try to find by ID or Code
+                    const account = await tx.account.findFirst({
+                        where: {
+                            tenantId,
+                            OR: [
+                                { id: parseInt(identifier) || -1 },
+                                { code: identifier }
+                            ]
+                        }
+                    });
+
+                    if (!account) {
+                        throw new Error(`Expense account not found: ${identifier}`);
+                    }
+                    // REASSIGN item.accountId to the REAL DB ID
+                    item.originalAccountId = item.accountId; // Keep trace if needed
+                    item.accountId = account.id;
+                }
+            }
+
             // 1. Create Journal Entry
             const journal = await tx.journal.create({
                 data: {
@@ -230,6 +276,7 @@ router.post('/', async (req, res) => {
                     discount,
                     total,
                     notes,
+                    attachmentUrl,
                     journalId: journal.id,
                     createdById: userId,
                     items: {

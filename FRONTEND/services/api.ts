@@ -477,12 +477,7 @@ class ApiService {
     return this.request(`/purchases/${id}`);
   }
 
-  async createPurchase(data: any): Promise<any> {
-    return this.request('/purchases', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
+
 
   async recordPurchasePayment(purchaseId: number, data: any): Promise<any> {
     return this.request(`/purchases/${purchaseId}/payment`, {
@@ -603,6 +598,13 @@ class ApiService {
     return this.request(`/invoices/${id}`);
   }
 
+  async recordPurchasePayment(purchaseId: number, data: any): Promise<any> {
+    return this.request(`/purchases/${purchaseId}/payment`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async createInvoice(data: any): Promise<any> {
     return this.request('/invoices', {
       method: 'POST',
@@ -683,38 +685,13 @@ class ApiService {
     }
   }
 
-  async createTransaction(payload: Partial<Transaction> & { type: TransactionType; amount: number; category: string; date: string }): Promise<Transaction> {
-    const body: any = {
-      ...payload,
-      debitAccountId: payload.debitAccountId,
-      creditAccountId: payload.creditAccountId,
-      accountId: payload.accountId,
-    };
-
-    try {
-      return await this.request<Transaction>('/transactions', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-    } catch (error) {
-      console.warn('createTransaction falling back to mock transaction');
-      const tx: Transaction = {
-        id: this.generateId('tx'),
-        type: payload.type,
-        amount: payload.amount,
-        category: payload.category,
-        description: payload.description,
-        paymentMethod: payload.paymentMethod,
-        date: payload.date,
-        notes: payload.notes,
-        debitAccountId: payload.debitAccountId,
-        creditAccountId: payload.creditAccountId,
-        accountId: payload.accountId,
-        user: payload.user,
-      };
-      this.mockTransactions.unshift(tx);
-      return tx;
-    }
+  async createPurchase(data: any): Promise<any> {
+    const isFormData = data instanceof FormData;
+    return this.request('/purchases', {
+      method: 'POST',
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
+      body: isFormData ? data : JSON.stringify(data),
+    });
   }
 
   // Family Settings APIs

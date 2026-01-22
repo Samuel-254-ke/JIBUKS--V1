@@ -146,32 +146,47 @@ export default function VendorProfileScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Quick Actions:</Text>
                     <View style={styles.actionsGrid}>
-                        <TouchableOpacity style={styles.actionButton}>
+                        <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() => router.push({
+                                pathname: '/pay-supplier',
+                                params: {
+                                    supplierId: supplierData.id,
+                                    supplierName: supplierData.name
+                                }
+                            })}
+                        >
                             <Ionicons name="cash" size={20} color="#ffffff" />
                             <Text style={styles.actionButtonText}>Pay Supplier</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.actionButton}>
+                        <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() => router.push({
+                                pathname: '/supplier-bill',
+                                params: {
+                                    supplierId: supplierData.id,
+                                    supplierName: supplierData.name
+                                }
+                            })}
+                        >
                             <Ionicons name="document-text" size={20} color="#ffffff" />
                             <Text style={styles.actionButtonText}>Add Bill</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.actionButton, styles.actionButtonOrange]}>
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.actionButtonOrange]}
+                            onPress={() => router.push({
+                                pathname: '/add-supplier',
+                                params: { id: supplierData.id }
+                            })}
+                        >
                             <Ionicons name="create" size={20} color="#ffffff" />
-                            <Text style={styles.actionButtonText}>Write Cheque</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.actionButton}>
-                            <Ionicons name="attach" size={20} color="#ffffff" />
-                            <Text style={styles.actionButtonText}>Attach Receipt</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={[styles.actionButton, styles.actionButtonOrange]}>
-                            <Ionicons name="wallet" size={20} color="#ffffff" />
-                            <Text style={styles.actionButtonText}>View Cheques</Text>
+                            <Text style={styles.actionButtonText}>Edit Profile</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
+
 
                 {/* Recent Transactions */}
                 <View style={styles.section}>
@@ -239,7 +254,7 @@ export default function VendorProfileScreen() {
                 {/* Bottom Spacing */}
                 <View style={{ height: 100 }} />
             </ScrollView>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 }
 
