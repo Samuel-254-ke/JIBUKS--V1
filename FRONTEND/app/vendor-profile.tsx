@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -6,31 +6,76 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
+    ActivityIndicator,
+    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import apiService from '../services/api';
+import Toast from 'react-native-toast-message';
 
 export default function VendorProfileScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const supplierName = params.name || 'Water Board';
+    const { id, name } = params;
 
-    // Sample data - in real app, fetch from backend
-    const supplierData = {
-        name: supplierName,
-        totalSpent: 340,
-        lastPayment: { amount: 20, date: 'Jan 10' },
-        unpaidBills: 1,
-        nextDue: { date: 'Feb 10', amount: 22 },
-        contact: '080-123-4567',
-        email: 'billing@waterboard.com',
-        notes: 'High usage in dry seasons',
-        recentTransactions: [
-            { id: 1, date: 'Jan 10', amount: 20, method: 'Cheque #202' },
-            { id: 2, date: 'Dec 10', amount: 20, method: 'Cash' },
-            { id: 3, date: 'Nov 08', amount: 18, method: 'Wallet' },
-        ],
-    };
+    const [supplierData, setSupplierData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchVendorDetails = async () => {
+            if (!id) return;
+            try {
+                const data = await apiService.getVendor(Number(id));
+                setSupplierData(data);
+            } catch (error) {
+                console.error("Failed to fetch vendor details", error);
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Failed to load vendor details'
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchVendorDetails();
+    }, [id]);
+
+
+    if (loading) {
+        return (
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#122f8a" />
+            </SafeAreaView>
+        );
+    }
+
+    if (!supplierData) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color="#1f2937" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Error</Text>
+                    <View style={{ width: 40 }} />
+                </View>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text>Supplier not found</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // Process data for display
+    const recentTransactions = supplierData.purchases || [];
+    const totalSpent = supplierData.stats?.totalPurchases || 0;
+    const unpaidBillsCount = recentTransactions.filter((p: any) => p.status !== 'PAID').length;
+    // Mocking next due as we don't have explicit due dates in basic purchase list yet, 
+    // or we could use the first unpaid bill's date
+    const lastPayment = { amount: supplierData.stats?.totalPaid || 0, date: 'Total Paid' }; // Simplified for now
 
     return (
         <SafeAreaView style={styles.container}>
@@ -46,28 +91,53 @@ export default function VendorProfileScreen() {
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Main Info */}
                 <View style={styles.section}>
+
+
                     <View style={styles.infoCard}>
-                        <Text style={styles.supplierName}>Supplier: {supplierData.name}</Text>
+                        {/* Vendor Logo & Name Header */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                            <View style={{
+                                width: 50, height: 50, borderRadius: 25,
+                                backgroundColor: '#122f8a', alignItems: 'center', justifyContent: 'center',
+                                marginRight: 12, overflow: 'hidden'
+                            }}>
+                                {supplierData.logoUrl ? (
+                                    <Image
+                                        source={{ uri: apiService.getImageUrl(supplierData.logoUrl) }}
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Text style={{ fontSize: 18, color: '#fff', fontWeight: 'bold' }}>
+                                        {supplierData.name ? supplierData.name.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase() : '?'}
+                                    </Text>
+                                )}
+                            </View>
+                            <Text style={[styles.supplierName, { marginBottom: 0 }]}>
+                                {supplierData.name}
+                            </Text>
+                        </View>
+
                         <View style={styles.divider} />
 
                         <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Total Spent:</Text>
-                            <Text style={styles.infoValue}>${supplierData.totalSpent}</Text>
+                            <Text style={styles.infoValue}>KES {Number(totalSpent).toLocaleString()}</Text>
                         </View>
 
                         <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Last Payment:</Text>
-                            <Text style={styles.infoValue}>${supplierData.lastPayment.amount} on {supplierData.lastPayment.date}</Text>
+                            <Text style={styles.infoLabel}>Total Paid:</Text>
+                            <Text style={styles.infoValue}>KES {Number(lastPayment.amount).toLocaleString()}</Text>
+                        </View>
+
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Outstanding Balance:</Text>
+                            <Text style={[styles.infoValue, { color: '#dc2626' }]}>KES {Number(supplierData.balance).toLocaleString()}</Text>
                         </View>
 
                         <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Unpaid Bills:</Text>
-                            <Text style={styles.infoValue}>{supplierData.unpaidBills}</Text>
-                        </View>
-
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Next Due:</Text>
-                            <Text style={styles.infoValue}>{supplierData.nextDue.date} - ${supplierData.nextDue.amount}</Text>
+                            <Text style={styles.infoValue}>{unpaidBillsCount}</Text>
                         </View>
                     </View>
                 </View>
@@ -108,14 +178,18 @@ export default function VendorProfileScreen() {
                     <View style={styles.visualCard}>
                         <Text style={styles.visualCardTitle}>Recent Transactions</Text>
                         <View style={styles.divider} />
-                        {supplierData.recentTransactions.map((transaction) => (
-                            <View key={transaction.id} style={styles.transactionItem}>
-                                <Text style={styles.bullet}>•</Text>
-                                <Text style={styles.transactionText}>
-                                    {transaction.date} - ${transaction.amount} - {transaction.method}
-                                </Text>
-                            </View>
-                        ))}
+                        {recentTransactions.length > 0 ? (
+                            recentTransactions.slice(0, 5).map((transaction: any) => (
+                                <View key={transaction.id} style={styles.transactionItem}>
+                                    <Text style={styles.bullet}>•</Text>
+                                    <Text style={styles.transactionText}>
+                                        {new Date(transaction.purchaseDate).toLocaleDateString()} - KES {Number(transaction.total).toLocaleString()} - {transaction.status}
+                                    </Text>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={{ color: '#6b7280', fontSize: 13, fontStyle: 'italic' }}>No recent transactions</Text>
+                        )}
                     </View>
                 </View>
 
@@ -124,19 +198,12 @@ export default function VendorProfileScreen() {
                     <View style={styles.visualCard}>
                         <Text style={styles.visualCardTitle}>Receipts</Text>
                         <View style={styles.divider} />
-                        <View style={styles.receiptsRow}>
-                            <View style={styles.thumbnail}>
-                                <Text style={styles.thumbnailText}>[Thumbnail]</Text>
-                            </View>
-                            <View style={styles.thumbnail}>
-                                <Text style={styles.thumbnailText}>[Thumbnail]</Text>
-                            </View>
-                            <View style={styles.thumbnail}>
-                                <Text style={styles.thumbnailText}>[Thumbnail]</Text>
-                            </View>
-                            <TouchableOpacity>
-                                <Text style={styles.viewAllLink}>+ View All</Text>
-                            </TouchableOpacity>
+                        {/* 
+                            TODO: Implement receipts fetching from backend.
+                            Currently API does not return attached receipts for vendor directly.
+                        */}
+                        <View style={[styles.receiptsRow, { justifyContent: 'center', paddingVertical: 10 }]}>
+                            <Text style={{ color: '#9ca3af', fontStyle: 'italic' }}>No receipts found</Text>
                         </View>
                     </View>
                 </View>
@@ -147,16 +214,24 @@ export default function VendorProfileScreen() {
                         <Text style={styles.visualCardTitle}>Supplier Info</Text>
                         <View style={styles.divider} />
                         <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Contact:</Text>
-                            <Text style={styles.infoValue}>{supplierData.contact}</Text>
+                            <Text style={styles.infoLabel}>Phone:</Text>
+                            <Text style={styles.infoValue}>{supplierData.phone || 'N/A'}</Text>
                         </View>
                         <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Email:</Text>
-                            <Text style={styles.infoValue}>{supplierData.email}</Text>
+                            <Text style={styles.infoValue}>{supplierData.email || 'N/A'}</Text>
                         </View>
                         <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Notes:</Text>
-                            <Text style={styles.infoValue}>{supplierData.notes}</Text>
+                            <Text style={styles.infoLabel}>Address:</Text>
+                            <Text style={styles.infoValue}>{supplierData.address || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Payment Terms:</Text>
+                            <Text style={styles.infoValue}>{supplierData.paymentTerms || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Tax ID:</Text>
+                            <Text style={styles.infoValue}>{supplierData.taxId || 'N/A'}</Text>
                         </View>
                     </View>
                 </View>

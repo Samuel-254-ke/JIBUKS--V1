@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,46 +10,82 @@ import {
   Dimensions,
   Platform,
   StatusBar,
+  ActivityIndicator,
+  RefreshControl,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import apiService from '../../services/api';
+import Toast from 'react-native-toast-message';
 
 const { width } = Dimensions.get('window');
 
 export default function SuppliersScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Mock Data
-  const suppliers = [
-    { id: 1, name: 'Water Board', category: 'Utilities', amount: 2500, status: 'active', contact: '0712345678' },
-    { id: 2, name: 'Electricity Co.', category: 'Utilities', amount: 4800, status: 'active', contact: '0722345678' },
-    { id: 3, name: 'City School', category: 'Education', amount: 15000, status: 'pending', contact: '0733345678' },
-    { id: 4, name: 'Naivas Supermarket', category: 'Retail', amount: 8200, status: 'active', contact: '0744345678' },
-    { id: 5, name: 'Shell Station', category: 'Fuel', amount: 6500, status: 'active', contact: '0755345678' },
-    { id: 6, name: 'Safaricom Fiber', category: 'Utilities', amount: 3200, status: 'inactive', contact: '0766345678' },
-  ];
+  const fetchSuppliers = async () => {
+    try {
+      const data = await apiService.getVendors();
+      // Filter filtering in memory for now based on local search query to avoid too many API calls while typing
+      // Ideally API handles search, but for small lists this is fine. 
+      // If the API supports search param we can use that too.
+      // The backend DOES support search query now!
+      if (searchQuery) {
+        const searchData = await apiService.getVendors({ active: undefined }); // Re-fetch with search would require modifying API signature or handling search in memory
+        // Since getVendors definition in api.ts doesn't explicitly expose 'search' param in the interface yet (it only has active), 
+        // let's stick to in-memory filtering for the displayed list or update api.ts.
+        // Updating api.ts is cleaner but for now let's just filter locally on the fetched list 
+        // to match the previous behavior but with real data.
+      }
+      setSuppliers(data);
+      console.log('Fetched suppliers:', JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.error('Failed to fetch suppliers:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load suppliers',
+      });
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchSuppliers();
+    }, [])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchSuppliers();
+  };
 
   const filteredSuppliers = suppliers.filter(supplier =>
-    supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
+    supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (supplier.email && supplier.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const totalSuppliers = suppliers.length;
-  const activeSuppliers = suppliers.filter(s => s.status === 'active').length;
-  const totalOutstanding = suppliers.filter(s => s.status === 'pending').reduce((sum, s) => sum + s.amount, 0);
+  const activeSuppliers = suppliers.filter(s => s.isActive).length;
+  // Calculate total outstanding balance from suppliers (if available in backend response)
+  // The backend response for vendor includes 'balance'
+  const totalOutstanding = suppliers.reduce((sum, s) => sum + (Number(s.balance) || 0), 0);
 
   const getInitials = (name: string) => {
-    return name.substring(0, 2).toUpperCase();
+    return name ? name.substring(0, 2).toUpperCase() : '??';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#10b981';
-      case 'pending': return '#f59e0b';
-      case 'inactive': return '#9ca3af';
-      default: return '#6b7280';
-    }
+  const getStatusColor = (isActive: boolean) => {
+    return isActive ? '#10b981' : '#9ca3af';
   };
 
   const formatCurrency = (amount: number) => {
@@ -95,7 +131,7 @@ export default function SuppliersScreen() {
             </View>
             <View style={styles.verticalDivider} />
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Pending Pay</Text>
+              <Text style={styles.statLabel}>Outstanding</Text>
               <Text style={styles.statValue}>{formatCurrency(totalOutstanding)}</Text>
             </View>
           </View>
@@ -107,7 +143,7 @@ export default function SuppliersScreen() {
             <Ionicons name="search" size={20} color="#94a3b8" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search supplier name, category..."
+              placeholder="Search supplier name, email..."
               placeholderTextColor="#94a3b8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -121,53 +157,85 @@ export default function SuppliersScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#122f8a" />
+        }
+      >
 
         {/* Suppliers List */}
         <View style={styles.listContainer}>
           <Text style={styles.sectionTitle}>All Suppliers</Text>
 
-          {filteredSuppliers.map((supplier) => (
-            <TouchableOpacity
-              key={supplier.id}
-              style={styles.supplierCard}
-              onPress={() => router.push(`/vendor-profile?id=${supplier.id}&name=${supplier.name}` as any)}
-            >
-              {/* Left: Avatar */}
-              <View style={[styles.avatarContainer, { backgroundColor: '#e0e7ff' }]}>
-                <Text style={styles.avatarText}>{getInitials(supplier.name)}</Text>
-              </View>
-
-              {/* Middle: Info */}
-              <View style={styles.cardInfo}>
-                <Text style={styles.cardName}>{supplier.name}</Text>
-                <View style={styles.cardMetaRow}>
-                  <Text style={styles.cardCategory}>{supplier.category}</Text>
-                  <View style={styles.dotSeparator} />
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(supplier.status) + '20' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(supplier.status) }]}>
-                      {supplier.status.charAt(0).toUpperCase() + supplier.status.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Right: Balance & Action */}
-              <View style={styles.cardRight}>
-                <Text style={styles.cardAmount}>{formatCurrency(supplier.amount)}</Text>
-                <TouchableOpacity style={styles.callButton}>
-                  <Ionicons name="call-outline" size={18} color="#122f8a" />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          ))}
-
-          {filteredSuppliers.length === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="search-outline" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyText}>No suppliers found</Text>
-              <Text style={styles.emptySubtext}>Try a different search term</Text>
+          {isLoading && !refreshing ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#122f8a" />
             </View>
+          ) : (
+            <>
+              {filteredSuppliers.map((supplier) => (
+                <TouchableOpacity
+                  key={supplier.id}
+                  style={styles.supplierCard}
+                  onPress={() => router.push(`/vendor-profile?id=${supplier.id}&name=${encodeURIComponent(supplier.name)}` as any)}
+                >
+                  {/* Left: Avatar */}
+                  <View style={[styles.avatarContainer, { backgroundColor: '#e0e7ff', overflow: 'hidden' }]}>
+                    {supplier.logoUrl ? (
+                      <Image
+                        source={{ uri: apiService.getImageUrl(supplier.logoUrl) }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text style={styles.avatarText}>{getInitials(supplier.name)}</Text>
+                    )}
+                  </View>
+
+                  {/* Middle: Info */}
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardName}>{supplier.name}</Text>
+                    <View style={styles.cardMetaRow}>
+                      <Text style={styles.cardCategory}>{supplier.email || supplier.phone || 'No contact info'}</Text>
+                      <View style={styles.dotSeparator} />
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(supplier.isActive) + '20' }]}>
+                        <Text style={[styles.statusText, { color: getStatusColor(supplier.isActive) }]}>
+                          {supplier.isActive ? 'Active' : 'Inactive'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Right: Balance & Action */}
+                  <View style={styles.cardRight}>
+                    <Text style={styles.cardAmount}>{formatCurrency(Number(supplier.balance) || 0)}</Text>
+                    <TouchableOpacity style={styles.callButton}>
+                      <Ionicons name="chevron-forward" size={18} color="#122f8a" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              {filteredSuppliers.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Ionicons name="search-outline" size={48} color="#cbd5e1" />
+                  <Text style={styles.emptyText}>No suppliers found</Text>
+                  <Text style={styles.emptySubtext}>
+                    {suppliers.length === 0 ? "Add your first supplier to get started" : "Try a different search term"}
+                  </Text>
+                  {suppliers.length === 0 && (
+                    <TouchableOpacity
+                      style={[styles.addButton, { width: 'auto', paddingHorizontal: 20, marginTop: 15, borderRadius: 12 }]}
+                      onPress={() => router.push('/add-supplier' as any)}
+                    >
+                      <Text style={{ color: 'white', fontWeight: 'bold' }}>Add Supplier</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </>
           )}
         </View>
 

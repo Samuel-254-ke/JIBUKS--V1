@@ -321,6 +321,21 @@ router.post('/', async (req, res) => {
                         }
                     }
                 });
+
+                // Update Vendor Stats
+                await tx.vendorStats.upsert({
+                    where: { vendorId: parseInt(vendorId) },
+                    create: {
+                        vendorId: parseInt(vendorId),
+                        totalPurchases: total,
+                        totalPaid: 0,
+                        lastPurchaseDate: purchaseDate ? new Date(purchaseDate) : new Date()
+                    },
+                    update: {
+                        totalPurchases: { increment: total },
+                        lastPurchaseDate: purchaseDate ? new Date(purchaseDate) : new Date()
+                    }
+                });
             }
 
             // 5. Update inventory if items are inventory items
@@ -598,6 +613,14 @@ router.post('/:id/payment', async (req, res) => {
                         balance: {
                             decrement: amount
                         }
+                    }
+                });
+
+                // Update Vendor Stats
+                await tx.vendorStats.update({
+                    where: { vendorId: purchase.vendorId },
+                    data: {
+                        totalPaid: { increment: amount }
                     }
                 });
             }

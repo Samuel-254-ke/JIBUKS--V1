@@ -42,6 +42,7 @@ model Tenant {
   receipts              Receipt[]
   expenses              Expense[]
   expenseCategories     ExpenseCategory[]
+  vendorTags            VendorTag[]
 
   @@map("tenants")
 }
@@ -329,15 +330,42 @@ model Vendor {
   paymentTerms    String?    @map("payment_terms") // "Net 30", "Due on Receipt"
   balance         Decimal    @default(0) // Current outstanding balance
   isActive        Boolean    @default(true) @map("is_active")
+  logoUrl         String?    @map("logo_url")
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
   
   tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   purchases       Purchase[]
   expenses        Expense[]
+  tags            VendorTag[]
+  stats           VendorStats?
   
   @@index([tenantId])
+  @@index([name])
   @@map("vendors")
+}
+
+model VendorTag {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  name      String
+  vendors   Vendor[]
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, name])
+  @@map("vendor_tags")
+}
+
+model VendorStats {
+  id              Int      @id @default(autoincrement())
+  vendorId        Int      @unique @map("vendor_id")
+  totalPurchases  Decimal  @default(0) @map("total_purchases")
+  totalPaid       Decimal  @default(0) @map("total_paid")
+  lastPurchaseDate DateTime? @map("last_purchase_date")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  vendor          Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  @@map("vendor_stats")
 }
 
 // Purchase/Bill Management

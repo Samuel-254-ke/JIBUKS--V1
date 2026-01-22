@@ -1,6 +1,7 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
 import { verifyJWT } from '../middleware/auth.js';
+import { upload } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ router.use(verifyJWT);
 
 /**
  * GET /api/vendors
- * Get all vendors for the tenant
+ * Get all vendors for the tenant with optional filtering and search
  */
 router.get('/', async (req, res) => {
     try {
@@ -23,17 +24,29 @@ router.get('/', async (req, res) => {
             return res.status(400).json({ error: 'User is not part of any family' });
         }
 
-        const { active } = req.query;
+        const { active, search } = req.query;
+
+        const where = {
+            tenantId,
+            ...(active !== undefined && { isActive: active === 'true' }),
+        };
+
+        if (search) {
+            where.OR = [
+                { name: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } },
+                { tags: { some: { name: { contains: search, mode: 'insensitive' } } } }
+            ];
+        }
 
         const vendors = await prisma.vendor.findMany({
-            where: {
-                tenantId,
-                ...(active !== undefined && { isActive: active === 'true' })
-            },
+            where,
             include: {
                 _count: {
                     select: { purchases: true }
-                }
+                },
+                tags: true,
+                stats: true
             },
             orderBy: { name: 'asc' }
         });
@@ -64,6 +77,8 @@ router.get('/:id', async (req, res) => {
                 tenantId
             },
             include: {
+                tags: true,
+                stats: true,
                 purchases: {
                     orderBy: { purchaseDate: 'desc' },
                     take: 10,
@@ -86,6 +101,11 @@ router.get('/:id', async (req, res) => {
         res.json({
             ...vendor,
             balance: Number(vendor.balance),
+            stats: vendor.stats ? {
+                ...vendor.stats,
+                totalPurchases: Number(vendor.stats.totalPurchases),
+                totalPaid: Number(vendor.stats.totalPaid)
+            } : null,
             purchases: vendor.purchases.map(p => ({
                 ...p,
                 total: Number(p.total),
@@ -103,10 +123,19 @@ router.get('/:id', async (req, res) => {
  * POST /api/vendors
  * Create a new vendor
  */
-router.post('/', async (req, res) => {
+router.post('/', upload.single('logo'), async (req, res) => {
     try {
         const { tenantId } = req.user;
-        const { name, email, phone, address, taxId, paymentTerms } = req.body;
+        const { name, email, phone, address, taxId, paymentTerms, tags } = req.body;
+
+        // Handle file upload
+        let logoUrl = null;
+        if (req.file) {
+            // Construct the public URL for the file
+            // Assuming the server serves 'public/uploads' at '/uploads' or similar
+            // Adjust based on your 'express.static' configuration in app.js
+            logoUrl = `/uploads/${req.file.filename}`;
+        }
 
         if (!tenantId) {
             return res.status(400).json({ error: 'User is not part of any family' });
@@ -114,6 +143,17 @@ router.post('/', async (req, res) => {
 
         if (!name) {
             return res.status(400).json({ error: 'Vendor name is required' });
+        }
+
+        // Parse tags if sent as string (common with FormData)
+        let parsedTags = tags;
+        if (typeof tags === 'string') {
+            try {
+                parsedTags = JSON.parse(tags);
+            } catch (e) {
+                // If not JSON, treat as single tag or comma-separated
+                parsedTags = tags.split(',').map(t => t.trim());
+            }
         }
 
         const vendor = await prisma.vendor.create({
@@ -124,13 +164,42 @@ router.post('/', async (req, res) => {
                 phone,
                 address,
                 taxId,
-                paymentTerms: paymentTerms || 'Due on Receipt'
+                paymentTerms: paymentTerms || 'Due on Receipt',
+                logoUrl,
+                // Handle tags if provided
+                tags: parsedTags && Array.isArray(parsedTags) ? {
+                    connectOrCreate: parsedTags.map(tag => ({
+                        where: {
+                            tenantId_name: { tenantId, name: tag.trim() }
+                        },
+                        create: {
+                            tenantId,
+                            name: tag.trim()
+                        }
+                    }))
+                } : undefined,
+                // Create initial stats stub
+                stats: {
+                    create: {
+                        totalPurchases: 0,
+                        totalPaid: 0
+                    }
+                }
+            },
+            include: {
+                tags: true,
+                stats: true
             }
         });
 
         res.status(201).json({
             ...vendor,
-            balance: Number(vendor.balance)
+            balance: Number(vendor.balance),
+            stats: {
+                ...vendor.stats,
+                totalPurchases: Number(vendor.stats.totalPurchases),
+                totalPaid: Number(vendor.stats.totalPaid)
+            }
         });
     } catch (error) {
         console.error('Error creating vendor:', error);
@@ -142,14 +211,20 @@ router.post('/', async (req, res) => {
  * PUT /api/vendors/:id
  * Update vendor details
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', upload.single('logo'), async (req, res) => {
     try {
         const { tenantId } = req.user;
         const { id } = req.params;
-        const { name, email, phone, address, taxId, paymentTerms, isActive } = req.body;
+        const { name, email, phone, address, taxId, paymentTerms, isActive, tags } = req.body;
 
         if (!tenantId) {
             return res.status(400).json({ error: 'User is not part of any family' });
+        }
+
+        // Handle file upload
+        let logoUrl = undefined;
+        if (req.file) {
+            logoUrl = `/uploads/${req.file.filename}`;
         }
 
         // Verify vendor belongs to tenant
@@ -161,6 +236,16 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Vendor not found' });
         }
 
+        // Parse tags if sent as string (common with FormData)
+        let parsedTags = tags;
+        if (tags && typeof tags === 'string') {
+            try {
+                parsedTags = JSON.parse(tags);
+            } catch (e) {
+                parsedTags = tags.split(',').map(t => t.trim());
+            }
+        }
+
         const vendor = await prisma.vendor.update({
             where: { id: parseInt(id) },
             data: {
@@ -170,13 +255,38 @@ router.put('/:id', async (req, res) => {
                 ...(address !== undefined && { address }),
                 ...(taxId !== undefined && { taxId }),
                 ...(paymentTerms !== undefined && { paymentTerms }),
-                ...(isActive !== undefined && { isActive })
+                ...(isActive !== undefined && { isActive: isActive === 'true' || isActive === true }), // Handle FormData boolean
+                ...(logoUrl !== undefined && { logoUrl }),
+                // Update tags if provided
+                ...(parsedTags !== undefined && Array.isArray(parsedTags) ? {
+                    tags: {
+                        set: [], // Clear existing relations
+                        connectOrCreate: parsedTags.map(tag => ({
+                            where: {
+                                tenantId_name: { tenantId, name: tag.trim() }
+                            },
+                            create: {
+                                tenantId,
+                                name: tag.trim()
+                            }
+                        }))
+                    }
+                } : {})
+            },
+            include: {
+                tags: true,
+                stats: true
             }
         });
 
         res.json({
             ...vendor,
-            balance: Number(vendor.balance)
+            balance: Number(vendor.balance),
+            stats: vendor.stats ? {
+                ...vendor.stats,
+                totalPurchases: Number(vendor.stats.totalPurchases),
+                totalPaid: Number(vendor.stats.totalPaid)
+            } : null
         });
     } catch (error) {
         console.error('Error updating vendor:', error);

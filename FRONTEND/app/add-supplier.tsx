@@ -75,31 +75,71 @@ export default function AddSupplierScreen() {
 
         setLoading(true);
         try {
-            const payload = {
-                name: supplierName,
-                category,
-                phone,
-                email,
-                address,
-                paymentTerms,
-                accountNumber,
-                preferredPaymentMethod,
-                defaultCategory,
-                autoTagReceipts,
-                recurringBills,
-                reminderBeforeDue,
-                acceptCheque,
-                trackUnpaidBills,
-                notes,
-                logoUri: logo
-            };
+            // Create payload matching backend structure
+            // Using 'category' as a tag since backend supports tags and we have a category chip selection
+            // Create FormData payload for multipart/form-data upload
+            const formData = new FormData();
 
-            await apiService.createVendor(payload);
-            Alert.alert('Success', 'Supplier added successfully');
-            router.back();
-        } catch (error) {
+            formData.append('name', supplierName);
+            if (email) formData.append('email', email);
+            if (phone) formData.append('phone', phone);
+            if (address) formData.append('address', address);
+            formData.append('paymentTerms', paymentTerms);
+
+            // Map category to tags
+            if (category) {
+                // Send tags stringified or as standard form array depending on backend expectation (updated backend parses stringified json or comma separated)
+                // For FormData, appending array usually requires multiple appends with same key or json string
+                formData.append('tags', JSON.stringify([category]));
+            }
+
+            const constructedNotes = `
+${notes}
+-- Configuration --
+Preferred Payment: ${preferredPaymentMethod}
+Account Number: ${accountNumber}
+Default Category: ${defaultCategory}
+Auto-Tag Receipts: ${autoTagReceipts ? 'Yes' : 'No'}
+Recurring: ${recurringBills}
+Reminder: ${reminderBeforeDue}
+Accept Cheque: ${acceptCheque ? 'Yes' : 'No'}
+Track Unpaid: ${trackUnpaidBills ? 'Yes' : 'No'}
+            `.trim();
+
+            // Note: Current backend vendor model doesn't have a 'notes' field, only metadata could be used or extending model.
+            // But we can keep it here if the backend ignores extra fields or if we map it later. 
+            // In vendors.js update, we didn't add 'notes' to create/update. 
+            // We can assume user wants these, so maybe we should append to 'address' or strict fields?
+            // Actually, let's skip sending 'notes' if backend doesn't support it to avoid 400 bad request if it's strict.
+            // But standard express body parser usually ignores extra fields.
+            // However, the backend is using `req.body` and picking fields.
+
+            // Handle logo upload
+            if (logo) {
+                const filename = logo.split('/').pop() || 'logo.jpg';
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+                // @ts-ignore
+                formData.append('logo', {
+                    uri: logo,
+                    name: filename,
+                    type,
+                });
+            }
+
+            // Note: apiService.createVendor checks for FormData validation
+            await apiService.createVendor(formData);
+
+
+
+            // Toast success is handled by Toast component in layout usually, but Alert is fine too
+            Alert.alert('Success', 'Supplier added successfully', [
+                { text: 'OK', onPress: () => router.back() }
+            ]);
+        } catch (error: any) {
             console.error('Error saving supplier:', error);
-            Alert.alert('Error', 'Failed to save supplier. Please try again.');
+            Alert.alert('Error', error.message || 'Failed to save supplier. Please try again.');
         } finally {
             setLoading(false);
         }

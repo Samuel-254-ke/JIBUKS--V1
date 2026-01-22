@@ -155,7 +155,7 @@ class ApiService {
     { id: 'cat-exp-health', name: 'Healthcare', type: 'expense', color: '#F7DC6F', icon: 'medical' },
     { id: 'cat-exp-education', name: 'Education', type: 'expense', color: '#BB8FCE', icon: 'school' },
     { id: 'cat-exp-shopping', name: 'Shopping', type: 'expense', color: '#85C1E2', icon: 'bag' },
-    
+
     // Income Categories
     { id: 'cat-inc-salary', name: 'Salary', type: 'income', color: '#52C41A', icon: 'cash' },
     { id: 'cat-inc-business', name: 'Business', type: 'income', color: '#1890FF', icon: 'briefcase' },
@@ -259,7 +259,12 @@ class ApiService {
 
       const response = await fetch(url, {
         ...options,
-        headers,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          ...headers,
+        },
       });
 
       const data = await response.json();
@@ -442,9 +447,20 @@ class ApiService {
   }
 
   async createVendor(data: any): Promise<any> {
+    const isFormData = data instanceof FormData;
     return this.request('/vendors', {
       method: 'POST',
-      body: JSON.stringify(data),
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
+      body: isFormData ? data : JSON.stringify(data),
+    });
+  }
+
+  async updateVendor(id: number, data: any): Promise<any> {
+    const isFormData = data instanceof FormData;
+    return this.request(`/vendors/${id}`, {
+      method: 'PUT',
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
+      body: isFormData ? data : JSON.stringify(data),
     });
   }
 
