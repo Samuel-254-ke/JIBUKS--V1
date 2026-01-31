@@ -20,7 +20,7 @@ export default function AccountTypeScreen() {
       if (type === 'family') {
         router.push('/family-setup');
       } else if (type === 'business') {
-        router.push('/business-tabs/business-onboarding');
+        router.push('/business-tabs');
       } else {
         // For 'both', maybe go to family first then business? 
         // Or create a combined flow. For now, defaulting to family setup.

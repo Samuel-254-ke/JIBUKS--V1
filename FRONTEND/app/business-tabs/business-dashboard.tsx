@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     Dimensions,
     Image,
+    RefreshControl,
+    ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,46 +17,103 @@ import apiService from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
-// Mock data for initial display, can be enhanced with real data integration
-const mockActivity = [
-    { id: 1, time: "9:30 AM", description: "Haircut sale", amount: 300 },
-    { id: 2, time: "11:15 AM", description: "Shampoo restock", amount: 500 }
-];
+function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good Morning';
+    if (h < 17) return 'Good Afternoon';
+    return 'Good Evening';
+}
+
+function formatCurrency(n: number) {
+    return `KES ${Number(n).toLocaleString()}`;
+}
+
+function formatActivityDate(d: string) {
+    const date = new Date(d);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    return isToday
+        ? date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
 
 export default function BusinessDashboardScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
 
     const [userName, setUserName] = useState<string>('');
+    const [summary, setSummary] = useState<{ totalIncome: number; totalExpenses: number; balance: number } | null>(null);
+    const [recentActivity, setRecentActivity] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const businessName = Array.isArray(params.businessName)
         ? params.businessName[0]
-        : params.businessName || "DORIS SALON AND KINYOZI";
+        : params.businessName || 'My Business';
     const ownerName = Array.isArray(params.ownerName)
         ? params.ownerName[0]
-        : params.ownerName || "Doris";
+        : params.ownerName || '';
+
+    const loadUserData = useCallback(async () => {
+        try {
+            const user = await apiService.getCurrentUser();
+            if (user && user.name) setUserName(user.name);
+        } catch (e) {
+            console.error('Error loading user:', e);
+        }
+    }, []);
+
+    const loadDashboard = useCallback(async () => {
+        try {
+            const data = await apiService.getDashboard();
+            if (data?.summary) {
+                setSummary({
+                    totalIncome: Number(data.summary.totalIncome ?? 0),
+                    totalExpenses: Number(data.summary.totalExpenses ?? 0),
+                    balance: Number(data.summary.balance ?? 0),
+                });
+            } else {
+                const stats = await apiService.getTransactionStats();
+                setSummary({
+                    totalIncome: stats.totalIncome ?? 0,
+                    totalExpenses: stats.totalExpenses ?? 0,
+                    balance: (stats.totalIncome ?? 0) - (stats.totalExpenses ?? 0),
+                });
+            }
+            const list = data?.recentTransactions ?? [];
+            setRecentActivity(Array.isArray(list) ? list.slice(0, 10) : []);
+        } catch (e) {
+            console.error('Error loading dashboard:', e);
+            setSummary({ totalIncome: 0, totalExpenses: 0, balance: 0 });
+            setRecentActivity([]);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
 
     useEffect(() => {
         loadUserData();
-    }, []);
+    }, [loadUserData]);
 
-    const loadUserData = async () => {
-        try {
-            const user = await apiService.getCurrentUser();
-            if (user && user.name) {
-                setUserName(user.name);
-            }
-        } catch (error) {
-            console.error('Error loading user:', error);
-        }
-    };
+    useEffect(() => {
+        loadDashboard();
+    }, [loadDashboard]);
 
-    const displayName = userName || ownerName;
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        loadDashboard();
+    }, [loadDashboard]);
+
+    const displayName = userName || ownerName || 'There';
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1e3a8a']} />}
+            >
                 {/* Blue Header Section */}
                 <View style={styles.header}>
                     <LinearGradient
@@ -68,7 +127,7 @@ export default function BusinessDashboardScreen() {
                                     style={styles.avatar}
                                 />
                             </View>
-                            <Text style={styles.greetingText}>Good Morning, {displayName} 👋</Text>
+                            <Text style={styles.greetingText}>{getGreeting()}, {displayName} 👋</Text>
                         </View>
 
                         {/* White Curved Card for Business Name */}
@@ -79,45 +138,53 @@ export default function BusinessDashboardScreen() {
                     </LinearGradient>
                 </View>
 
-                {/* Todays Summary Section */}
+                {/* Summary Section */}
                 <View style={styles.summarySection}>
                     <View style={styles.summaryCard}>
-                        <Text style={styles.summaryHeader}>Todays Summary</Text>
-                        <View style={styles.summaryRow}>
-                            <View style={styles.summaryItem}>
-                                <View style={styles.summaryValueContainer}>
-                                    <Text style={styles.emoji}>💰</Text>
-                                    <Text style={styles.currencyValue}>KES 0</Text>
-                                </View>
-                                <Text style={styles.summaryLabel}>Income</Text>
+                        <Text style={styles.summaryHeader}>This month</Text>
+                        {loading ? (
+                            <View style={styles.summaryRow}>
+                                <ActivityIndicator size="small" color="#1e3a8a" style={{ flex: 1 }} />
                             </View>
-                            <View style={styles.summaryItem}>
-                                <View style={styles.summaryValueContainer}>
-                                    <Text style={styles.emoji}>💸</Text>
-                                    <Text style={styles.currencyValue}>KES 0</Text>
+                        ) : (
+                            <View style={styles.summaryRow}>
+                                <View style={styles.summaryItem}>
+                                    <View style={styles.summaryValueContainer}>
+                                        <Text style={styles.emoji}>💰</Text>
+                                        <Text style={styles.currencyValue}>{formatCurrency(summary?.totalIncome ?? 0)}</Text>
+                                    </View>
+                                    <Text style={styles.summaryLabel}>Income</Text>
                                 </View>
-                                <Text style={styles.summaryLabel}>Expenses</Text>
-                            </View>
-                            <View style={styles.summaryItem}>
-                                <View style={styles.summaryValueContainer}>
-                                    <Text style={styles.emoji}>📊</Text>
-                                    <Text style={styles.currencyValue}>KES 0</Text>
+                                <View style={styles.summaryItem}>
+                                    <View style={styles.summaryValueContainer}>
+                                        <Text style={styles.emoji}>💸</Text>
+                                        <Text style={styles.currencyValue}>{formatCurrency(summary?.totalExpenses ?? 0)}</Text>
+                                    </View>
+                                    <Text style={styles.summaryLabel}>Expenses</Text>
                                 </View>
-                                <Text style={styles.summaryLabel}>Balance</Text>
+                                <View style={styles.summaryItem}>
+                                    <View style={styles.summaryValueContainer}>
+                                        <Text style={styles.emoji}>📊</Text>
+                                        <Text style={[styles.currencyValue, { color: (summary?.balance ?? 0) >= 0 ? '#10b981' : '#ef4444' }]}>
+                                            {formatCurrency(summary?.balance ?? 0)}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.summaryLabel}>Balance</Text>
+                                </View>
                             </View>
-                        </View>
+                        )}
                     </View>
                 </View>
 
                 {/* Action Buttons Row */}
                 <View style={styles.actionsRow}>
-                    <TouchableOpacity style={styles.actionButton}>
-                        <Text style={styles.actionButtonText}>CashSale</Text>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/business-tabs/sales/cash-sale')}>
+                        <Text style={styles.actionButtonText}>Cash Sale</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/create-invoice')}>
                         <Text style={styles.actionButtonText}>Credit Sale</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/add-expense')}>
                         <Text style={styles.actionButtonText}>Add Expense</Text>
                     </TouchableOpacity>
                 </View>
@@ -125,13 +192,13 @@ export default function BusinessDashboardScreen() {
                 {/* Management Grid */}
                 <View style={styles.gridContainer}>
                     <View style={styles.gridRow}>
-                        <GridItem emoji="👤" label="Customers" />
-                        <GridItem emoji="👨‍👩‍👧‍👦" label="Suppliers" />
-                        <GridItem emoji="💰" label="Expenses" />
+                        <GridItem emoji="👤" label="Customers" onPress={() => router.push('/business-tabs/sales/customers')} />
+                        <GridItem emoji="👨‍👩‍👧‍👦" label="Suppliers" onPress={() => router.push('/vendors')} />
+                        <GridItem emoji="💰" label="Expenses" onPress={() => router.push('/expenses')} />
                     </View>
                     <View style={styles.gridRow}>
-                        <GridItem emoji="📈" label="Reports" />
-                        <GridItem emoji="📥" label="Income" />
+                        <GridItem emoji="📈" label="Reports" onPress={() => router.push('/reports')} />
+                        <GridItem emoji="📥" label="Income" onPress={() => router.push('/income')} />
                         <GridItem emoji="⋮" label="MORE" onPress={() => router.push('/business-tabs/more-business')} />
                     </View>
                 </View>
@@ -140,14 +207,22 @@ export default function BusinessDashboardScreen() {
                 <View style={styles.activitySection}>
                     <View style={styles.activityContainer}>
                         <Text style={styles.activityTitle}>Recent Activity</Text>
-                        {mockActivity.map((item) => (
-                            <View key={item.id} style={styles.activityItem}>
-                                <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
-                                <Text style={styles.activityText}>
-                                    {item.time} - {item.description} · KES {item.amount}
-                                </Text>
-                            </View>
-                        ))}
+                        {recentActivity.length === 0 ? (
+                            <Text style={styles.activityEmpty}>No recent transactions</Text>
+                        ) : (
+                            recentActivity.map((item: any) => (
+                                <View key={item.id} style={styles.activityItem}>
+                                    <Ionicons
+                                        name={item.type === 'INCOME' ? 'arrow-down-circle' : 'arrow-up-circle'}
+                                        size={16}
+                                        color={item.type === 'INCOME' ? '#10b981' : '#ef4444'}
+                                    />
+                                    <Text style={styles.activityText} numberOfLines={1}>
+                                        {formatActivityDate(item.date)} · {item.description || item.category || 'Transaction'} · {formatCurrency(Number(item.amount ?? 0))}
+                                    </Text>
+                                </View>
+                            ))
+                        )}
                     </View>
                 </View>
 
@@ -158,7 +233,6 @@ export default function BusinessDashboardScreen() {
                         <Text style={styles.footerIconText}>A</Text>
                     </View>
                 </View>
-
             </ScrollView>
         </View>
     );
@@ -380,6 +454,12 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#374151',
         marginLeft: 8,
+        flex: 1,
+    },
+    activityEmpty: {
+        fontSize: 13,
+        color: '#6b7280',
+        fontStyle: 'italic',
     },
     footer: {
         marginTop: 30,

@@ -92,6 +92,11 @@ export default function RootLayout() {
             <Stack.Screen name="business-tabs/business-dashboard" options={{ headerShown: false }} />
             <Stack.Screen name="business-tabs/more-business" options={{ headerShown: false }} />
             <Stack.Screen name="business-tabs/index" options={{ headerShown: false }} />
+            <Stack.Screen name="business-tabs/sales/customers" options={{ headerShown: false }} />
+            <Stack.Screen name="business-tabs/sales/invoices" options={{ headerShown: false }} />
+            <Stack.Screen name="business-tabs/sales/cash-sale" options={{ headerShown: false }} />
+            <Stack.Screen name="business-tabs/sales/payments" options={{ headerShown: false }} />
+            <Stack.Screen name="business-tabs/sales/credit-notes" options={{ headerShown: false }} />
             <Stack.Screen name="family-settings" options={{ headerShown: false }} />
             <Stack.Screen name="edit-member-permissions" options={{ headerShown: false }} />
             <Stack.Screen name="edit-family-profile" options={{ headerShown: false }} />

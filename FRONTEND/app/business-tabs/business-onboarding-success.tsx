@@ -4,7 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const ONBOARDING_KEY = 'businessOnboardingComplete';
 const { width } = Dimensions.get('window');
 
 export default function BusinessOnboardingSuccessScreen() {
@@ -17,7 +19,8 @@ export default function BusinessOnboardingSuccessScreen() {
     const currency = params.currency || 'KES';
     const template = params.styleChoice === 'simple' ? 'Simple Style' : 'Detailed Style';
 
-    const handleStart = () => {
+    const handleStart = async () => {
+        await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
         router.replace({
             pathname: '/business-tabs/business-dashboard',
             params: {
