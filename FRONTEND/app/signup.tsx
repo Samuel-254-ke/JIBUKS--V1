@@ -1,9 +1,10 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { showToast } from '@/utils/toast'
+import type { TenantType } from '@/services/api'
 
 const Signup = () => {
   const router = useRouter()
@@ -17,6 +18,7 @@ const Signup = () => {
     password: '',
     confirmPassword: ''
   })
+  const [tenantType, setTenantType] = useState<TenantType>('FAMILY')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -54,7 +56,8 @@ const Signup = () => {
       email: formData.email,
       phone: formData.phoneNumber,
       password: formData.password,
-      confirmPassword: formData.confirmPassword
+      confirmPassword: formData.confirmPassword,
+      tenantType,
     }
 
     try {
@@ -94,6 +97,31 @@ const Signup = () => {
 
         {/* Form */}
         <View style={styles.form}>
+          {/* Tenant Type */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>I'm signing up for:</Text>
+            <View style={styles.tenantTypeRow}>
+              <TouchableOpacity
+                style={[styles.tenantTypeBtn, tenantType === 'FAMILY' && styles.tenantTypeBtnSelected]}
+                onPress={() => setTenantType('FAMILY')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.tenantTypeIcon}>🏠</Text>
+                <Text style={[styles.tenantTypeLabel, tenantType === 'FAMILY' && styles.tenantTypeLabelSelected]}>Family</Text>
+                <Text style={styles.tenantTypeHint}>(Home & savings)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tenantTypeBtn, tenantType === 'BUSINESS' && styles.tenantTypeBtnSelected]}
+                onPress={() => setTenantType('BUSINESS')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.tenantTypeIcon}>🏢</Text>
+                <Text style={[styles.tenantTypeLabel, tenantType === 'BUSINESS' && styles.tenantTypeLabelSelected]}>Business</Text>
+                <Text style={styles.tenantTypeHint}>(Shop, NGO, etc.)</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* First Name */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>First Name:</Text>
@@ -330,5 +358,40 @@ const styles = StyleSheet.create({
     color: '#4285F4',
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  tenantTypeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  tenantTypeBtn: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  tenantTypeBtnSelected: {
+    borderColor: '#4285F4',
+    backgroundColor: '#e8f0fe',
+  },
+  tenantTypeIcon: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  tenantTypeLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  tenantTypeLabelSelected: {
+    color: '#4285F4',
+  },
+  tenantTypeHint: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
   },
 })
