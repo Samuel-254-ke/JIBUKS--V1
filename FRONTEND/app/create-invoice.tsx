@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -11,18 +11,51 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Picker } from '@react-native-picker/picker';
 import apiService from '@/services/api';
 
+// Default tax % for new invoices (can later come from tenant/business settings)
+const DEFAULT_TAX_PERCENT = 0;
+
+/** Parse payment terms string to days until due. e.g. "Net 30" -> 30, "Due on Receipt" -> 0 */
+function getDaysFromPaymentTerms(paymentTerms: string | null | undefined): number {
+    if (!paymentTerms || typeof paymentTerms !== 'string') return 30;
+    const s = paymentTerms.trim().toLowerCase();
+    if (s.includes('receipt') || s === 'due on receipt') return 0;
+    const netMatch = s.match(/net\s*(\d+)/);
+    if (netMatch) return Math.max(0, parseInt(netMatch[1], 10));
+    if (s.includes('15')) return 15;
+    if (s.includes('60')) return 60;
+    if (s.includes('90')) return 90;
+    return 30;
+}
+
+/** Compute due date YYYY-MM-DD from invoice date and payment terms */
+function computeDueDate(invoiceDateStr: string, paymentTerms: string | null | undefined): string {
+    const days = getDaysFromPaymentTerms(paymentTerms);
+    const d = new Date(invoiceDateStr);
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+}
+
+/**
+ * Create Invoice (Credit Sale): invoice only, no payment.
+ * CoA: DR Accounts Receivable, CR Revenue. Payment recorded later posts DR Cash/Bank, CR AR.
+ */
 export default function CreateInvoiceScreen() {
     const router = useRouter();
+    const params = useLocalSearchParams();
+    const initialCustomerIdParam = Array.isArray(params.customerId) ? params.customerId[0] : params.customerId;
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState<any[]>([]);
     const [accounts, setAccounts] = useState<any[]>([]);
     const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+    const [businessTypeFilter, setBusinessTypeFilter] = useState('');
 
     // Form state
-    const [customerId, setCustomerId] = useState('');
+    const [customerId, setCustomerId] = useState(initialCustomerIdParam ? String(initialCustomerIdParam) : '');
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
     const [dueDate, setDueDate] = useState('');
@@ -30,29 +63,62 @@ export default function CreateInvoiceScreen() {
     const [items, setItems] = useState([
         { description: '', quantity: '', unitPrice: '', accountId: '', inventoryItemId: '' }
     ]);
-    const [tax, setTax] = useState('0');
+    const [tax, setTax] = useState(String(DEFAULT_TAX_PERCENT));
     const [discount, setDiscount] = useState('0');
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
-            const [customersData, accountsData, inventoryData] = await Promise.all([
-                apiService.getCustomers(),
+            const [customersRes, accountsData, inventoryData] = await Promise.all([
+                apiService.getCustomers({
+                    active: true,
+                    limit: 100,
+                    offset: 0,
+                    businessType: businessTypeFilter || undefined,
+                }),
                 apiService.getAccounts(),
                 apiService.getInventory()
             ]);
-            setCustomers(customersData);
-            // Filter for revenue/income accounts
-            setAccounts(accountsData.filter((a: any) => a.type === 'INCOME'));
-            setInventoryItems(inventoryData);
+            const customerList = Array.isArray(customersRes) ? customersRes : (customersRes?.customers ?? []);
+            setCustomers(customerList);
+            setAccounts((accountsData || []).filter((a: any) => a.type === 'INCOME'));
+            setInventoryItems(inventoryData || []);
+            // If current selection is not in filtered list, clear it
+            setCustomerId(prev => {
+                if (!prev) return prev;
+                const found = customerList.some((c: any) => String(c.id) === String(prev));
+                return found ? prev : '';
+            });
         } catch (error) {
             console.error('Error loading data:', error);
             Alert.alert('Error', 'Failed to load customers and accounts');
         }
-    };
+    }, [businessTypeFilter]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    // When customer or invoice date changes, set due date from customer's payment terms
+    useEffect(() => {
+        if (!customerId || !invoiceDate) return;
+        const customer = (customers ?? []).find((c: any) => String(c.id) === String(customerId));
+        const terms = customer?.paymentTerms ?? undefined;
+        const computed = computeDueDate(invoiceDate, terms);
+        if (computed) setDueDate(computed);
+    }, [customerId, invoiceDate, customers]);
+
+    // After first load, if we had initial customer from URL, ensure due date is set
+    const [dueDateInitialized, setDueDateInitialized] = useState(false);
+    useEffect(() => {
+        if (dueDateInitialized || !customerId || customers.length === 0) return;
+        const customer = customers.find((c: any) => String(c.id) === String(customerId));
+        if (!customer) return;
+        const computed = computeDueDate(invoiceDate, customer.paymentTerms);
+        if (computed) {
+            setDueDate(computed);
+            setDueDateInitialized(true);
+        }
+    }, [customerId, customers, invoiceDate, dueDateInitialized]);
 
     const addItem = () => {
         setItems([...items, { description: '', quantity: '', unitPrice: '', accountId: '', inventoryItemId: '' }]);
@@ -164,21 +230,39 @@ export default function CreateInvoiceScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Customer Information</Text>
 
+                    <Text style={styles.label}>Filter by business type</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                        {['', 'retail', 'wholesale', 'corporate', 'individual', 'government', 'nonprofit'].map((type) => (
+                            <TouchableOpacity
+                                key={type || 'all'}
+                                style={[styles.filterChip, businessTypeFilter === type && styles.filterChipActive]}
+                                onPress={() => setBusinessTypeFilter(type)}
+                            >
+                                <Text style={[styles.filterChipText, businessTypeFilter === type && styles.filterChipTextActive]}>
+                                    {type === '' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
                     <Text style={styles.label}>Customer *</Text>
                     <View style={styles.pickerContainer}>
                         <Ionicons name="person-outline" size={20} color="#6b7280" />
-                        <select
-                            value={customerId}
-                            onChange={(e) => setCustomerId(e.target.value)}
+                        <Picker
+                            selectedValue={customerId}
+                            onValueChange={(value) => setCustomerId(value ?? '')}
                             style={styles.picker}
+                            prompt="Select Customer"
                         >
-                            <option value="">Select Customer</option>
-                            {customers.map(customer => (
-                                <option key={customer.id} value={customer.id}>
-                                    {customer.name}
-                                </option>
+                            <Picker.Item label="Select Customer" value="" />
+                            {(customers ?? []).map((customer: any) => (
+                                <Picker.Item
+                                    key={customer.id}
+                                    label={customer.companyName || customer.name}
+                                    value={String(customer.id)}
+                                />
                             ))}
-                        </select>
+                        </Picker>
                     </View>
 
                     <Text style={styles.label}>Invoice Number</Text>
@@ -213,9 +297,10 @@ export default function CreateInvoiceScreen() {
                                     style={styles.input}
                                     value={dueDate}
                                     onChangeText={setDueDate}
-                                    placeholder="YYYY-MM-DD"
+                                    placeholder="Auto from payment terms"
                                 />
                             </View>
+                            <Text style={styles.hint}>Set from customer payment terms when customer is selected</Text>
                         </View>
                     </View>
                 </View>
@@ -244,18 +329,21 @@ export default function CreateInvoiceScreen() {
                             <Text style={styles.label}>Inventory Item (Optional)</Text>
                             <View style={styles.pickerContainer}>
                                 <Ionicons name="cube-outline" size={20} color="#6b7280" />
-                                <select
-                                    value={item.inventoryItemId}
-                                    onChange={(e) => updateItem(index, 'inventoryItemId', e.target.value)}
+                                <Picker
+                                    selectedValue={item.inventoryItemId ? String(item.inventoryItemId) : ''}
+                                    onValueChange={(value) => updateItem(index, 'inventoryItemId', value || '')}
                                     style={styles.picker}
+                                    prompt="Select Inventory Item"
                                 >
-                                    <option value="">Select Inventory Item</option>
-                                    {inventoryItems.map(invItem => (
-                                        <option key={invItem.id} value={invItem.id}>
-                                            {invItem.name} - {invItem.sku}
-                                        </option>
+                                    <Picker.Item label="Select Inventory Item" value="" />
+                                    {(inventoryItems ?? []).map((invItem: any) => (
+                                        <Picker.Item
+                                            key={invItem.id}
+                                            label={`${invItem.name} - ${invItem.sku || ''}`}
+                                            value={String(invItem.id)}
+                                        />
                                     ))}
-                                </select>
+                                </Picker>
                             </View>
 
                             <Text style={styles.label}>Description *</Text>
@@ -271,18 +359,21 @@ export default function CreateInvoiceScreen() {
                             <Text style={styles.label}>Revenue Account</Text>
                             <View style={styles.pickerContainer}>
                                 <Ionicons name="folder-outline" size={20} color="#6b7280" />
-                                <select
-                                    value={item.accountId}
-                                    onChange={(e) => updateItem(index, 'accountId', e.target.value)}
+                                <Picker
+                                    selectedValue={item.accountId ? String(item.accountId) : ''}
+                                    onValueChange={(value) => updateItem(index, 'accountId', value || '')}
                                     style={styles.picker}
+                                    prompt="Select Account"
                                 >
-                                    <option value="">Select Account</option>
-                                    {accounts.map(account => (
-                                        <option key={account.id} value={account.id}>
-                                            {account.code} - {account.name}
-                                        </option>
+                                    <Picker.Item label="Select Account" value="" />
+                                    {(accounts ?? []).map((account: any) => (
+                                        <Picker.Item
+                                            key={account.id}
+                                            label={`${account.code || ''} - ${account.name}`}
+                                            value={String(account.id)}
+                                        />
                                     ))}
-                                </select>
+                                </Picker>
                             </View>
 
                             <View style={styles.row}>
@@ -324,14 +415,15 @@ export default function CreateInvoiceScreen() {
 
                     <View style={styles.row}>
                         <View style={{ flex: 1, marginRight: 8 }}>
-                            <Text style={styles.label}>Tax</Text>
+                            <Text style={styles.label}>Tax (e.g. VAT % or amount)</Text>
                             <TextInput
                                 style={styles.inputSmall}
-                                placeholder="0.00"
+                                placeholder="0"
                                 value={tax}
                                 onChangeText={setTax}
                                 keyboardType="decimal-pad"
                             />
+                            <Text style={styles.hint}>Default {DEFAULT_TAX_PERCENT}%. Editable per invoice.</Text>
                         </View>
                         <View style={{ flex: 1, marginLeft: 8 }}>
                             <Text style={styles.label}>Discount</Text>
@@ -512,6 +604,37 @@ const styles = StyleSheet.create({
     },
     row: {
         flexDirection: 'row',
+    },
+    filterRow: {
+        marginBottom: 12,
+        marginTop: 4,
+    },
+    filterChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#f3f4f6',
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    filterChipActive: {
+        backgroundColor: '#dbeafe',
+        borderColor: '#2563eb',
+    },
+    filterChipText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#6b7280',
+    },
+    filterChipTextActive: {
+        color: '#2563eb',
+    },
+    hint: {
+        fontSize: 11,
+        color: '#9ca3af',
+        marginTop: 4,
+        marginLeft: 0,
     },
     addItemButton: {
         flexDirection: 'row',

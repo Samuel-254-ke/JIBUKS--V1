@@ -1,6 +1,8 @@
 /**
  * B-013: Quick POS cash sale
  * Create invoice + record full payment in one flow.
+ * CoA: (1) Create invoice → DR Accounts Receivable, CR Revenue.
+ *      (2) Record payment → DR Cash/Bank, CR Accounts Receivable.
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -38,14 +40,16 @@ export default function CashSaleScreen() {
 
     const loadData = async () => {
         try {
-            const [cust, acc] = await Promise.all([
+            const [custRes, acc] = await Promise.all([
                 apiService.getCustomers(),
                 apiService.getPaymentEligibleAccounts(),
             ]);
-            setCustomers(cust);
-            setAccounts(acc);
-            if (acc.length > 0 && !accountId) setAccountId(String(acc[0].id));
-            if (cust.length > 0 && !customerId) setCustomerId(String(cust[0].id));
+            const custList = Array.isArray(custRes) ? custRes : (custRes?.customers ?? []);
+            const accList = Array.isArray(acc) ? acc : (acc ?? []);
+            setCustomers(custList);
+            setAccounts(accList);
+            if (accList.length > 0 && !accountId) setAccountId(String(accList[0].id));
+            if (custList.length > 0 && !customerId) setCustomerId(String(custList[0].id));
         } catch (e) {
             console.error(e);
             Alert.alert('Error', 'Failed to load customers and accounts');
@@ -86,9 +90,16 @@ export default function CashSaleScreen() {
             Alert.alert('Error', 'Add at least one item with description, quantity and price');
             return;
         }
+        if ((accounts ?? []).length === 0) {
+            Alert.alert(
+                'Setup Required',
+                'No payment accounts (Cash/Bank) found. Please complete business setup so the Chart of Accounts is seeded, then try again.'
+            );
+            return;
+        }
         const payAccountId = accountId ? parseInt(accountId) : undefined;
-        if (!payAccountId && accounts.length > 0) {
-            Alert.alert('Error', 'Please select a payment account (e.g. Cash)');
+        if (!payAccountId) {
+            Alert.alert('Error', 'Please select a payment account (e.g. Cash or Bank) so the sale posts to the correct account.');
             return;
         }
 
@@ -147,7 +158,7 @@ export default function CashSaleScreen() {
                 <View style={styles.pickerWrap}>
                     <Ionicons name="person-outline" size={20} color="#6b7280" />
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.customerScroll}>
-                        {customers.map((c) => (
+                        {(customers ?? []).map((c) => (
                             <TouchableOpacity
                                 key={c.id}
                                 style={[styles.chip, customerId === String(c.id) && styles.chipActive]}
@@ -160,7 +171,7 @@ export default function CashSaleScreen() {
                         ))}
                     </ScrollView>
                 </View>
-                {customers.length === 0 && (
+                {(customers ?? []).length === 0 && (
                     <Text style={styles.hint}>Add customers first from the Customers screen.</Text>
                 )}
 
@@ -206,7 +217,7 @@ export default function CashSaleScreen() {
                 <View style={styles.pickerWrap}>
                     <Ionicons name="wallet-outline" size={20} color="#6b7280" />
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.customerScroll}>
-                        {accounts.map((a) => (
+                        {(accounts ?? []).map((a) => (
                             <TouchableOpacity
                                 key={a.id}
                                 style={[styles.chip, accountId === String(a.id) && styles.chipActive]}
