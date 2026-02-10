@@ -9,7 +9,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "db:init": "node scripts/initDb.js",
-    "seed": "node scripts/seed_master.js",
+    "seed": "node prisma/seed.js",
     "seed:assets": "node scripts/seed_assets.js",
     "seed:liabilities": "node scripts/seed_liabilities_update.js",
     "seed:equity": "node scripts/seed_equity.js",
@@ -18,7 +18,7 @@
     "seed:suppliers": "node scripts/seed_kenyan_suppliers.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^6.19.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
@@ -36,6 +36,10 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.11",
+<<<<<<< HEAD
     "prisma": "^5.22.0"
+=======
+    "prisma": "^6.19.2"
+>>>>>>> 7b223aac5c533a02ec2b25beb75128d05dea973b
   }
 }

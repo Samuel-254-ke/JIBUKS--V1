@@ -308,6 +308,37 @@ class ApiService {
     }
   }
 
+  // Convenience methods
+  public async get<T = any>(endpoint: string, params?: any): Promise<T> {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    const url = `${endpoint}${query}`;
+    return this.request<T>(url);
+  }
+
+  public async post<T = any>(endpoint: string, data?: any): Promise<T> {
+    const isFormData = data instanceof FormData;
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
+      body: (isFormData ? data : JSON.stringify(data)) as any,
+    });
+  }
+
+  public async put<T = any>(endpoint: string, data?: any): Promise<T> {
+    const isFormData = data instanceof FormData;
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
+      body: (isFormData ? data : JSON.stringify(data)) as any,
+    });
+  }
+
+  public async delete<T = any>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+    });
+  }
+
   // Authentication endpoints
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/auth/login', {
@@ -494,31 +525,46 @@ class ApiService {
   }
 
   // Inventory
-  async getInventory(params?: { active?: boolean; lowStock?: boolean }): Promise<any[]> {
+  async getInventory(params?: { lowStock?: boolean; search?: string; page?: number; limit?: number; type?: string; category?: string }): Promise<any[]> {
     const query = new URLSearchParams();
-    if (params?.active !== undefined) query.append('active', String(params.active));
     if (params?.lowStock !== undefined) query.append('lowStock', String(params.lowStock));
+    if (params?.search) query.append('search', params.search);
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.type) query.append('type', params.type);
+    if (params?.category) query.append('category', params.category);
     const suffix = query.toString() ? `?${query.toString()}` : '';
-    return this.request(`/inventory${suffix}`);
+
+    // Backend route: GET /api/inventory/products
+    const res = await this.request(`/inventory/products${suffix}`);
+    // Normalise shape so callers can keep using a plain array
+    if (res && Array.isArray((res as any).data)) {
+      return (res as any).data;
+    }
+    return Array.isArray(res) ? res : [];
   }
 
   async getInventoryItem(id: number): Promise<any> {
-    return this.request(`/inventory/${id}`);
+    // Backend route: GET /api/inventory/products/:id
+    return this.request(`/inventory/products/${id}`);
   }
 
   async createInventoryItem(data: any): Promise<any> {
-    return this.request('/inventory', {
+    // Backend route: POST /api/inventory/products
+    return this.request('/inventory/products', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
+  // Inventory valuation is not yet implemented server-side; keep method for future use
   async getInventoryValuation(): Promise<any> {
     return this.request('/inventory/valuation/current');
   }
 
   async createStockAdjustment(data: any): Promise<any> {
-    return this.request('/inventory/adjustment', {
+    // Backend route: POST /api/inventory/adjust
+    return this.request('/inventory/adjust', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -564,9 +610,9 @@ class ApiService {
   }
 
   // Customers
-  async getCustomers(params?: { 
-    active?: boolean; 
-    search?: string; 
+  async getCustomers(params?: {
+    active?: boolean;
+    search?: string;
     businessType?: string;
     limit?: number;
     offset?: number;
@@ -603,9 +649,9 @@ class ApiService {
     return this.request(`/customers/${id}/balance`);
   }
 
-  async getCustomerTransactions(id: number, params?: { 
-    limit?: number; 
-    offset?: number; 
+  async getCustomerTransactions(id: number, params?: {
+    limit?: number;
+    offset?: number;
     type?: 'invoices' | 'payments';
   }): Promise<any> {
     const query = new URLSearchParams();
@@ -1012,6 +1058,23 @@ class ApiService {
 
     return this.request<any>(`/reports/category-analysis${suffix}`);
   }
+
+  async getAccountTransactions(accountId: string | number, params?: {
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    offset?: number
+  }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.startDate) query.append('startDate', params.startDate);
+    if (params?.endDate) query.append('endDate', params.endDate);
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.offset) query.append('offset', String(params.offset));
+
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<any>(`/reports/account-transactions/${accountId}${suffix}`);
+  }
+
 
   // ============================================
   // CHEQUE MANAGEMENT - Revolutionary Feature
