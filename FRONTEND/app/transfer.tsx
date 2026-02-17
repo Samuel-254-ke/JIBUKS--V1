@@ -24,7 +24,7 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
     return Constants.expoConfig?.extra?.[key] || process.env[key] || defaultValue;
 };
 
-const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '172.20.10.2');
+const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '192.168.1.69');
 const API_PORT = getEnvVar('EXPO_PUBLIC_API_PORT', '4400');
 const API_BASE_URL = `http://${LOCAL_IP}:${API_PORT}`;
 

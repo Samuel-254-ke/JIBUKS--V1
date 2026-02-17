@@ -258,15 +258,33 @@ export default function BusinessDashboardScreen() {
                 )}
 
                 {/* Action Buttons Row — Cash Sale and Credit Sale post to Chart of Accounts (AR, Revenue, Cash/Bank) */}
-                <View style={styles.actionsRow}>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/business-tabs/sales/cash-sale')}>
+                <View style={[styles.actionsRow, { flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }]}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/business-tabs/sales/cash-sale')}
+                    >
                         <Text style={styles.actionButtonText}>Cash Sale</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/create-invoice')}>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/create-invoice')}
+                    >
                         <Text style={styles.actionButtonText}>Credit Sale</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/add-expense')}>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/add-expense')}
+                    >
                         <Text style={styles.actionButtonText}>Add Expense</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/write-cheque')}
+                    >
+                        <Text style={styles.actionButtonText}>Create Cheque</Text>
                     </TouchableOpacity>
                 </View>
 

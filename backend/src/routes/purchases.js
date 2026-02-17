@@ -209,14 +209,32 @@ router.post('/', upload.single('attachment'), async (req, res) => {
         const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
         const total = subtotal + tax - discount;
 
-        // Get Accounts Payable account
-        const accountsPayable = await prisma.account.findFirst({
-            where: {
-                tenantId,
-                type: 'LIABILITY',
-                name: { contains: 'Accounts Payable', mode: 'insensitive' }
+        // Get Accounts Payable account (or selected Liability Account)
+        let accountsPayable;
+
+        // 1. If explicit AP Account ID is provided (e.g. Rent Payable)
+        if (req.body.apAccountId) {
+            accountsPayable = await prisma.account.findFirst({
+                where: {
+                    id: parseInt(req.body.apAccountId),
+                    tenantId,
+                    type: 'LIABILITY'
+                }
+            });
+            if (!accountsPayable) {
+                return res.status(400).json({ error: 'Selected A/P Account not found or invalid' });
             }
-        });
+        }
+        // 2. Fallback: Find default "Accounts Payable"
+        else {
+            accountsPayable = await prisma.account.findFirst({
+                where: {
+                    tenantId,
+                    type: 'LIABILITY',
+                    name: { contains: 'Accounts Payable', mode: 'insensitive' }
+                }
+            });
+        }
 
         if (!accountsPayable) {
             return res.status(400).json({
@@ -329,7 +347,7 @@ router.post('/', upload.single('attachment'), async (req, res) => {
             // Calculate total VAT from all line items
             const totalVAT = items.reduce((sum, item) => sum + (Number(item.vatAmount) || 0), 0);
 
-            if (totalVAT > 0) {
+            if (Math.abs(totalVAT) > 0.001) {
                 // Find VAT Receivable Account (Input VAT = Asset)
                 const vatReceivableAccount = await tx.account.findFirst({
                     where: {
@@ -346,23 +364,22 @@ router.post('/', upload.single('attachment'), async (req, res) => {
                 });
 
                 if (!vatReceivableAccount) {
-                    console.warn('⚠️ VAT Receivable account (1157) not found. VAT will not be recorded.');
-                    console.warn('   Please run: node backend/scripts/seed_assets.js');
-                } else {
-                    // Debit: VAT Receivable (Asset - Balance Sheet)
-                    // This is INPUT VAT we can claim back from KRA
-                    await tx.journalLine.create({
-                        data: {
-                            journalId: journal.id,
-                            accountId: vatReceivableAccount.id,
-                            debit: totalVAT,
-                            credit: 0,
-                            description: `Input VAT - ${purchase.billNumber || `Purchase #${purchase.id}`}`
-                        }
-                    });
-
-                    console.log(`✅ Input VAT recorded: KES ${totalVAT.toFixed(2)} → VAT Receivable (${vatReceivableAccount.code})`);
+                    throw new Error('VAT Receivable account (1157) not found. Cannot record VAT. Please contact support or run setup.');
                 }
+
+                // Debit: VAT Receivable (Asset - Balance Sheet)
+                // This is INPUT VAT we can claim back from KRA
+                await tx.journalLine.create({
+                    data: {
+                        journalId: journal.id,
+                        accountId: vatReceivableAccount.id,
+                        debit: totalVAT,
+                        credit: 0,
+                        description: `Input VAT - ${purchase.billNumber || `Purchase #${purchase.id}`}`
+                    }
+                });
+
+                console.log(`✅ Input VAT recorded: KES ${totalVAT.toFixed(2)} → VAT Receivable (${vatReceivableAccount.code})`);
             }
 
             // Recalculate total including VAT
@@ -611,7 +628,10 @@ router.post('/:id/payment', async (req, res) => {
             });
         }
 
-        if (!paymentAccount.isPaymentEligible) {
+        // Allow if explicitly eligible OR if it is a cash account (subtype 'cash')
+        const isCash = paymentAccount.subtype === 'cash' || paymentAccount.name.toLowerCase().includes('cash');
+
+        if (!paymentAccount.isPaymentEligible && !isCash) {
             return res.status(400).json({
                 error: 'INVALID_PAYMENT_ACCOUNT',
                 message: 'Selected account is not a valid payment account.',

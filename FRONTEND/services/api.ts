@@ -8,7 +8,7 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
   return Constants.expoConfig?.extra?.[key] || process.env[key] || defaultValue;
 };
 
-const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '172.20.10.2');
+const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '192.168.1.69');
 const API_PORT = getEnvVar('EXPO_PUBLIC_API_PORT', '4400');
 
 // Build API base URL based on platform
@@ -819,6 +819,20 @@ class ApiService {
       method: 'POST',
       headers: isFormData ? {} : { 'Content-Type': 'application/json' },
       body: (isFormData ? data : JSON.stringify(data)) as any,
+    });
+  }
+
+  async createPurchasePayment(purchaseId: number | string, data: {
+    amount: number;
+    paymentDate: string;
+    paymentMethod: string;
+    reference?: string;
+    notes?: string;
+    bankAccountId: number | string;
+  }): Promise<any> {
+    return this.request(`/purchases/${purchaseId}/payment`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

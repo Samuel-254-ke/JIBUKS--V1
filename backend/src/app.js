@@ -32,7 +32,7 @@ import vatRatesRoutes from './routes/vat-rates.js';
 const app = express();
 
 // Get configuration from environment
-const LOCAL_IP = process.env.LOCAL_NETWORK_IP || '192.168.0.102';
+const LOCAL_IP = process.env.LOCAL_NETWORK_IP || '192.168.1.69';
 const PORT = process.env.PORT || '4001';
 
 // Build dynamic CORS origins
