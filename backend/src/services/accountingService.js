@@ -1182,6 +1182,65 @@ export function getAccountMapping(category, type) {
     }
 }
 
+// ============================================
+// COA HELPER LOOKUPS (AR, Revenue, Payment Accounts)
+// ============================================
+
+/**
+ * Find the Accounts Receivable control account for a tenant.
+ * Prefers AR by systemTag, then subtype, then common AR code (1250).
+ */
+export async function getAccountsReceivableAccountId(tenantId) {
+    const account = await prisma.account.findFirst({
+        where: {
+            tenantId,
+            isActive: true,
+            OR: [
+                { systemTag: 'AR' },
+                { subtype: 'ar' },
+                { code: '1250' },
+            ],
+        },
+    });
+    return account?.id ?? null;
+}
+
+/**
+ * Find a default revenue account (INCOME) for a tenant.
+ * Prefers common sales codes 4100/4110, falls back to first INCOME account.
+ */
+export async function getDefaultRevenueAccountId(tenantId) {
+    const account = await prisma.account.findFirst({
+        where: {
+            tenantId,
+            type: 'INCOME',
+            isActive: true,
+            OR: [
+                { code: '4100' },
+                { code: '4110' },
+            ],
+        },
+        orderBy: { code: 'asc' },
+    });
+    return account?.id ?? null;
+}
+
+/**
+ * Find a default payment account (Cash/Bank) for a tenant.
+ * Uses accounts flagged as payment-eligible.
+ */
+export async function getDefaultPaymentAccountId(tenantId) {
+    const account = await prisma.account.findFirst({
+        where: {
+            tenantId,
+            isPaymentEligible: true,
+            isActive: true,
+        },
+        orderBy: { code: 'asc' },
+    });
+    return account?.id ?? null;
+}
+
 /**
  * Resolves account codes to account IDs for a tenant
  * 
@@ -2301,91 +2360,6 @@ export async function disposeAsset(tenantId, userId, assetId, disposalData) {
     });
 
     return updatedAsset;
-}
-
-
-
-/**
- * Get the main Accounts Receivable account ID for a tenant
- * @param {number} tenantId
- * @returns {Promise<string|null>} Account ID or null
- */
-export async function getAccountsReceivableAccountId(tenantId) {
-    const account = await prisma.account.findFirst({
-        where: {
-            tenantId,
-            systemTag: 'AR' // Using system tag is safer
-        },
-        select: { id: true }
-    });
-
-    if (account) return account.id;
-
-    // Fallback to code 1100 if tag is missing
-    const fallback = await prisma.account.findFirst({
-        where: {
-            tenantId,
-            code: '1100'
-        },
-        select: { id: true }
-    });
-
-    return fallback ? fallback.id : null;
-}
-
-/**
- * Get default Revenue account ID (Sales Revenue)
- * @param {number} tenantId
- * @returns {Promise<string|null>}
- */
-export async function getDefaultRevenueAccountId(tenantId) {
-    const account = await prisma.account.findFirst({
-        where: {
-            tenantId,
-            code: '4100' // Sales Revenue
-        },
-        select: { id: true }
-    });
-
-    if (account) return account.id;
-
-    // Fallback to any Income account
-    const anyIncome = await prisma.account.findFirst({
-        where: { tenantId, type: 'INCOME' },
-        select: { id: true }
-    });
-
-    return anyIncome ? anyIncome.id : null;
-}
-
-/**
- * Get default Payment account ID (Cash/Bank)
- * Used as default destination for incoming payments or source for outgoing
- * @param {number} tenantId
- * @returns {Promise<string|null>}
- */
-export async function getDefaultPaymentAccountId(tenantId) {
-    // Try to find Cash on Hand (1001)
-    const cash = await prisma.account.findFirst({
-        where: {
-            tenantId,
-            code: '1001'
-        },
-        select: { id: true }
-    });
-    if (cash) return cash.id;
-
-    // Fallback to any payment eligible asset
-    const liquid = await prisma.account.findFirst({
-        where: {
-            tenantId,
-            isPaymentEligible: true,
-            type: 'ASSET'
-        },
-        select: { id: true }
-    });
-
-    return liquid ? liquid.id : null;
 }
 
 // ============================================
