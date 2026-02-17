@@ -62,14 +62,10 @@ export const FAMILY_COA_TEMPLATE = [
     // ----------------------------------------
     // CASH & CASH EQUIVALENTS (1000-1099)
     // ----------------------------------------
-    { code: '1000', name: 'Cash & Cash Equivalents', type: 'ASSET', description: 'Total physical cash and equivalents', isSystem: true, isContra: false, subtype: 'cash', isParent: true },
+    { code: '1000', name: 'Cash & Cash Equivalents', type: 'ASSET', description: 'Total physical cash and equivalents', isSystem: true, isContra: false, subtype: 'cash', isPaymentEligible: true, systemTag: 'CASH' },
 
-    // Physical Cash (1001-1009)
-    { code: '1001', name: 'Cash on Hand (Wallet)', type: 'ASSET', description: 'Physical cash carried daily', isSystem: true, isContra: false, isPaymentEligible: true, subtype: 'cash', systemTag: 'CASH', parentCode: '1000' },
-    { code: '1002', name: 'Petty Cash (Home Safe)', type: 'ASSET', description: 'Emergency cash kept at home', isSystem: false, isContra: false, isPaymentEligible: true, subtype: 'cash', parentCode: '1000' },
-    { code: '1003', name: 'Petty Cash (Office)', type: 'ASSET', description: 'Small office expenses cash', isSystem: false, isContra: false, isPaymentEligible: true, subtype: 'cash', parentCode: '1000' },
-    { code: '1004', name: 'Cash Register', type: 'ASSET', description: 'Shop/business till cash', isSystem: false, isContra: false, isPaymentEligible: true, subtype: 'cash', parentCode: '1000' },
-    { code: '1005', name: 'Undeposited Funds', type: 'ASSET', description: 'Cash received not yet banked', isSystem: true, isContra: false, subtype: 'cash', parentCode: '1000' },
+    // Undeposited Funds
+    { code: '1005', name: 'Undeposited Funds', type: 'ASSET', description: 'Cash received not yet banked', isSystem: true, isContra: false, subtype: 'cash' },
 
     // Bank Accounts (1010-1049)
     { code: '1010', name: 'Commercial Bank Accounts', type: 'ASSET', description: 'Total holdings in commercial banks', isSystem: true, isContra: false, subtype: 'bank', isParent: true },
@@ -142,7 +138,7 @@ export const FAMILY_COA_TEMPLATE = [
     { code: '1154', name: 'Rent Security Deposits', type: 'ASSET', description: 'Refundable deposit with landlord', isSystem: false, isContra: false, subtype: 'other_receivable', parentCode: '1150' },
     { code: '1155', name: 'Utility Deposits', type: 'ASSET', description: 'Deposit with Kenya Power/Water', isSystem: false, isContra: false, subtype: 'other_receivable', parentCode: '1150' },
     { code: '1156', name: 'Insurance Deposits', type: 'ASSET', description: 'Refundable insurance deposits', isSystem: false, isContra: false, subtype: 'other_receivable', parentCode: '1150' },
-    { code: '1157', name: 'VAT Receivable (Input VAT)', type: 'ASSET', description: 'VAT paid on purchases - 16%', isSystem: true, isContra: false, subtype: 'tax_receivable', parentCode: '1150' },
+    { code: '1157', name: 'VAT Payable (Input)', type: 'ASSET', description: 'VAT paid on purchases - 16%', isSystem: true, isContra: false, subtype: 'tax_receivable', parentCode: '1150' },
     { code: '1158', name: 'WHT Receivable', type: 'ASSET', description: 'Withholding tax to claim', isSystem: false, isContra: false, subtype: 'tax_receivable', parentCode: '1150' },
     { code: '1159', name: 'Prepaid Expenses', type: 'ASSET', description: 'Services paid in advance', isSystem: false, isContra: false, subtype: 'prepayment', parentCode: '1150' },
     { code: '1160', name: 'Prepaid Rent', type: 'ASSET', description: 'Rent paid in advance', isSystem: false, isContra: false, subtype: 'prepayment', parentCode: '1150' },
@@ -1842,7 +1838,8 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
             total: 0
         },
         liabilities: {
-            current: { total: 0, accounts: [] },     // Accounts Payable, Short-term debt (2000-2499)
+            accountsPayable: { total: 0, accounts: [] }, // Accounts Payable (2000-2049)
+            current: { total: 0, accounts: [] },     // Credit Cards, Short-term debt (2050-2499)
             nonCurrent: { total: 0, accounts: [] },  // Loans, Long-term debt (2500-2999)
             total: 0
         },
@@ -1852,7 +1849,9 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
         }
     };
 
-    // ==================== STEP 2: SORT INTO BUCKETS ====================
+    // ==================== STEP 2: SORT & CALCULATE ====================
+    let computedNetIncome = 0;
+
     rawAccounts.forEach(account => {
         let balance = Number(account.balance);
         const code = parseInt(account.code);
@@ -1860,8 +1859,18 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
         // Strict Zero Filter
         if (!hasRealBalance(balance)) return;
 
-        // Skip Income (4xxx) and Expense (5xxx) items - they are rolled into Retained Earnings
-        if (account.type === 'INCOME' || account.type === 'EXPENSE') return;
+        // Calculate Net Income from P&L accounts (Income + Expense)
+        // Note: getAccountBalance returns Positive for normal balances.
+        // Income (Credit) -> Positive. Expense (Debit) -> Positive.
+        // Net Income = Income - Expense.
+        if (account.type === 'INCOME') {
+            computedNetIncome += balance;
+            return; // Don't add to Balance Sheet buckets
+        }
+        if (account.type === 'EXPENSE') {
+            computedNetIncome -= balance;
+            return; // Don't add to Balance Sheet buckets
+        }
 
         // Formatting Helper
         const formatItem = () => ({
@@ -1873,21 +1882,17 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
 
         // --- ASSETS (1000-1999) ---
         if (code >= 1000 && code <= 1999) {
-            // Determine Current vs Non-Current
-            // Current: 1000-1499 (Cash, Bank, AR, Inventory)
-            // Non-Current: 1500-1999 (Fixed Assets, Investments, Contra-Assets)
+            // Updated Logic based on FAMILY_COA_TEMPLATE:
+            // 1000-1299: Current Assets (Cash, Bank, Mobile, Receivables, Inventory)
+            // 1300-1499: Fixed Assets (Property, Equipment, Vehicles) -> NON-CURRENT
+            // 1500-1999: Investments, Intangibles, Other -> NON-CURRENT
 
-            // Special handling for Accumulated Depreciation (Contra-Asset)
-            // Ideally, it should be negative balance if it's a credit balance account.
-            // getAccountBalance returns 'debits - credits' for ASSET type.
-            // If accumulated depreciation is an ASSET type but normally credit, it will come as negative.
-
-            if (code >= 1000 && code <= 1499) {
+            if (code >= 1000 && code <= 1299) {
                 // Current Assets
                 structure.assets.current.accounts.push(formatItem());
                 structure.assets.current.total += balance;
             } else {
-                // Non-Current Assets
+                // Non-Current Assets (Fixed + Investments)
                 structure.assets.nonCurrent.accounts.push(formatItem());
                 structure.assets.nonCurrent.total += balance;
             }
@@ -1895,11 +1900,14 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
 
         // --- LIABILITIES (2000-2999) ---
         else if (code >= 2000 && code <= 2999) {
-            // Determine Current vs Non-Current
-            // Current: 2000-2499 (AP, Credit Cards, Short-term)
-            // Non-Current: 2500-2999 (Loans)
+            // 2000-2049: Accounts Payable
+            // 2050-2499: Other Current Liabilities (Credit Cards, Taxes, Payroll, ST Loans, Accruals)
+            // 2500-2999: Long-Term Liabilities (Loans, Bonds)
 
-            if (code >= 2000 && code <= 2499) {
+            if (code >= 2000 && code <= 2049) {
+                structure.liabilities.accountsPayable.accounts.push(formatItem());
+                structure.liabilities.accountsPayable.total += balance;
+            } else if (code >= 2050 && code <= 2499) {
                 structure.liabilities.current.accounts.push(formatItem());
                 structure.liabilities.current.total += balance;
             } else {
@@ -1910,25 +1918,28 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
 
         // --- EQUITY (3000-3999) ---
         else if (code >= 3000 && code <= 3999) {
+            // Existing Equity accounts (Capital, Reserves, etc.)
             structure.equity.accounts.push(formatItem());
             structure.equity.total += balance;
         }
     });
 
-    // ==================== STEP 3: ADD RETAINED EARNINGS ====================
-    // Only add if non-zero
-    if (Math.abs(retainedEarningsAmount) > 0.00) {
+    // ==================== STEP 3: ADD COMPUTED NET INCOME ====================
+    // This represents "Current Year Earnings" OR "Total Retained Earnings" if books never closed.
+    // We add this to the Equity section to balance the equation: Assets = Liabs + Equity + NetIncome
+    if (Math.abs(computedNetIncome) > 0.00) {
         structure.equity.accounts.push({
-            code: '3999', // Virtual code
-            name: 'Retained Earnings', // Or "Net Income for Period"
-            amount: retainedEarningsAmount
+            id: 'calculated-retained-earnings',
+            code: '3054', // Matches template 'Current Year Earnings'
+            name: 'Current Year Earnings',
+            amount: computedNetIncome
         });
-        structure.equity.total += retainedEarningsAmount;
+        structure.equity.total += computedNetIncome;
     }
 
     // ==================== STEP 4: CALCULATE GRAND TOTALS ====================
     structure.assets.total = structure.assets.current.total + structure.assets.nonCurrent.total;
-    structure.liabilities.total = structure.liabilities.current.total + structure.liabilities.nonCurrent.total;
+    structure.liabilities.total = structure.liabilities.accountsPayable.total + structure.liabilities.current.total + structure.liabilities.nonCurrent.total;
 
     const totalLiabilitiesAndEquity = structure.liabilities.total + structure.equity.total;
 
@@ -1954,8 +1965,13 @@ export async function getBalanceSheet(tenantId, asOfDate = new Date()) {
         },
         liabilitiesAndEquity: {
             liabilities: {
+                accountsPayable: {
+                    label: "Accounts Payable",
+                    items: structure.liabilities.accountsPayable.accounts,
+                    total: structure.liabilities.accountsPayable.total
+                },
                 currentLiabilities: {
-                    label: "Current Liabilities",
+                    label: "Other Current Liabilities",
                     items: structure.liabilities.current.accounts,
                     total: structure.liabilities.current.total
                 },

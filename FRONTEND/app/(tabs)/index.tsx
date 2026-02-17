@@ -280,6 +280,14 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.actionLabel}>Stock Value</Text>
             </TouchableOpacity>
+
+            {/* 13. Create Cheque (NEW) */}
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/write-cheque')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#eef2ff' }]}>
+                <Ionicons name="create-outline" size={24} color="#4338ca" />
+              </View>
+              <Text style={styles.actionLabel}>Create Cheque</Text>
+            </TouchableOpacity>
           </View>
         </View>
 

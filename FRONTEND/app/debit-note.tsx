@@ -23,7 +23,7 @@ type LineItem = {
     amount: string;
 };
 
-export default function BillScreen() {
+export default function DebitNoteScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -33,7 +33,7 @@ export default function BillScreen() {
     const [paymentAccounts, setPaymentAccounts] = useState<Account[]>([]);
     const [vatRates, setVatRates] = useState<any[]>([]);
 
-    const [isDebitNote, setIsDebitNote] = useState(false);
+    const [isDebitNote, setIsDebitNote] = useState(true);
     const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
     const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
     const [refNo, setRefNo] = useState('');
@@ -84,7 +84,6 @@ export default function BillScreen() {
                 !a.name?.toLowerCase().includes('inventory') &&
                 !a.name?.toLowerCase().includes('stock') &&
                 !a.code?.startsWith('12') &&
-                // Exclude traditional AP accounts if they accidentally appear in ASSET
                 !a.name?.includes('Payable') &&
                 !a.code?.includes('2100') &&
                 (a.code?.startsWith('13') ||  // Fixed Assets (1300-1399)
@@ -100,8 +99,6 @@ export default function BillScreen() {
             );
 
             // Filter Accounts Payable (Parent and Children)
-            // 2000 is typically Accounts Payable Control
-            // We want accounts that are subtype='ap' OR code 20xx OR name includes 'Payable'
             const apAccounts = liabilityData.filter(a =>
                 (a.subtype === 'ap') ||
                 (a.code && a.code.startsWith('20')) ||
@@ -109,14 +106,11 @@ export default function BillScreen() {
                 (a.systemTag === 'AP')
             );
 
-            // If specific children exist (Rent Payable, etc), prioritize them.
-            // If parent 'Accounts Payable' exists, show it too.
-
             setSuppliers(vendorsData);
             setExpenseAccounts(expenseData);
             setInventoryAccounts(inventoryData);
             setOtherAssetAccounts(otherAssetData);
-            setPaymentAccounts(apAccounts); // These are now correctly liabilities
+            setPaymentAccounts(apAccounts); // Liabilities
             setVatRates(vatRatesData);
 
             if (expenseData.length > 0) {
@@ -125,10 +119,7 @@ export default function BillScreen() {
                 ));
             }
 
-            // Default to 'Rent Payable' or first available AP logic if you want
             if (apAccounts.length > 0) {
-                // Try to find one that matches standard 'Accounts Payable' as default?
-                // Or leave blank? Usually defaults to main AP.
                 const defaultAP = apAccounts.find(a => a.code === '2000') || apAccounts[0];
                 if (defaultAP) setSelectedAccountId(String(defaultAP.id));
             }
@@ -238,10 +229,14 @@ export default function BillScreen() {
                         }
                     }
 
+                    // NEGATE amounts for Debit Note
+                    baseAmount = -baseAmount;
+                    vatAmount = -vatAmount;
+
                     return {
-                        description: item.description || item.memo || `Bill from ${suppliers.find(s => s.id === selectedSupplierId)?.name}`,
+                        description: item.description || item.memo || `Debit Note for ${suppliers.find(s => s.id === selectedSupplierId)?.name}`,
                         quantity: 1,
-                        unitPrice: baseAmount, // Send base amount only
+                        unitPrice: baseAmount, // Negative amount for Debit Note
                         accountId: accountIdNum,
                         // VAT data
                         taxTreatment: item.taxTreatment,
@@ -251,24 +246,35 @@ export default function BillScreen() {
                     };
                 });
 
+            // Calculate negative tax totals
+            const totalTax = -Math.abs(vatAmount); // Negate the tax amount
+            const totalDiscount = 0;
+
             const formData = new FormData();
             formData.append('vendorId', String(selectedSupplierId));
             formData.append('purchaseDate', date.toISOString());
             formData.append('dueDate', dueDate.toISOString());
-            formData.append('billNumber', refNo);
-            formData.append('notes', lineItems[0].memo);
+            formData.append('billNumber', refNo || `DN-${Date.now()}`); // Ensure a reference
+            formData.append('notes', lineItems[0].memo || 'Debit Note');
             formData.append('status', 'UNPAID');
             formData.append('items', JSON.stringify(items));
+
+            // We can send negative tax if the backend uses it for total calculation
+            // Based on backend code: total = subtotal + tax - discount
+            // If subtotal is negative (because items are negative), and tax is negative, total will be negative.
+            // This correctly reverses the AP and Expense/Asset entries.
+            formData.append('tax', String(totalTax));
+
             if (selectedAccountId) {
                 formData.append('apAccountId', selectedAccountId);
             }
 
             await apiService.createPurchase(formData);
-            Alert.alert('Success', 'Bill saved successfully', [
+            Alert.alert('Success', 'Debit Note saved successfully', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to save bill');
+            Alert.alert('Error', error.message || 'Failed to save debit note');
         } finally {
             setLoading(false);
         }
@@ -289,16 +295,16 @@ export default function BillScreen() {
                     <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Bill</Text>
+                    <Text style={styles.headerTitle}>Debit Note</Text>
                     <View style={styles.toggleContainer}>
                         <TouchableOpacity
-                            onPress={() => setIsDebitNote(false)}
+                            onPress={() => router.push('/bill-entry')} // Navigate to Bill Entry
                             style={[styles.toggleBtn, !isDebitNote && styles.toggleActiveOrange]}
                         >
                             <Text style={[styles.toggleText, !isDebitNote && styles.toggleTextActive]}>Bill</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => router.push('/debit-note')}
+                            onPress={() => { }} // Already on Debit Note
                             style={[styles.toggleBtn, isDebitNote && styles.toggleActiveOrange]}
                         >
                             <Text style={[styles.toggleText, isDebitNote && styles.toggleTextActive]}>Debit Note</Text>
@@ -348,19 +354,20 @@ export default function BillScreen() {
                                 style={styles.input}
                                 value={refNo}
                                 onChangeText={setRefNo}
-                                placeholder="Optional"
+                                placeholder="Debit Note No."
                                 placeholderTextColor="#94a3b8"
                             />
                         </View>
 
                         <View style={styles.rowFields}>
                             <View style={styles.halfField}>
-                                <Text style={styles.label}>Bill Date</Text>
+                                <Text style={styles.label}>Date</Text>
                                 <TouchableOpacity style={styles.inputBox} onPress={() => setShowDatePicker(true)}>
                                     <Ionicons name="calendar-outline" size={16} color="#64748b" />
                                     <Text style={styles.dateText}>{formatDate(date)}</Text>
                                 </TouchableOpacity>
                             </View>
+                            {/* Debit Notes often don't have a distinct due date, but keeping it for consistency/payment terms */}
                             <View style={styles.halfField}>
                                 <Text style={styles.label}>Due Date</Text>
                                 <TouchableOpacity style={styles.inputBox} onPress={() => setShowDueDatePicker(true)}>
@@ -504,7 +511,7 @@ export default function BillScreen() {
                             )}
 
                             <View style={[styles.totalRow, styles.grandTotalRow]}>
-                                <Text style={styles.grandTotalLabel}>Total</Text>
+                                <Text style={styles.grandTotalLabel}>Total Credit</Text>
                                 <Text style={styles.grandTotalValue}>KES {total.toFixed(2)}</Text>
                             </View>
                         </View>
@@ -515,7 +522,7 @@ export default function BillScreen() {
                                 {loading ? (
                                     <ActivityIndicator color="#fff" />
                                 ) : (
-                                    <Text style={styles.saveBtnText}>Save Bill</Text>
+                                    <Text style={styles.saveBtnText}>Save Debit Note</Text>
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
@@ -745,13 +752,13 @@ export default function BillScreen() {
                 </View>
             </Modal>
 
-            {/* Date Picker for Bill Date */}
+            {/* Date Picker for Date */}
             <CustomDatePicker
                 visible={showDatePicker}
                 onClose={() => setShowDatePicker(false)}
                 date={date}
                 onChange={setDate}
-                title="Select Bill Date"
+                title="Select Date"
             />
 
             {/* Date Picker for Due Date */}

@@ -169,22 +169,14 @@ export default function BusinessDashboardScreen() {
                         colors={['#1e3a8a', '#1e3a8a']} // Solid deep blue as per screenshot
                         style={styles.headerGradient}
                     >
-                        <View style={styles.headerTopRow}>
-                            <View style={styles.profileSection}>
-                                <View style={styles.avatarBorder}>
-                                    <Image
-                                        source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200' }}
-                                        style={styles.avatar}
-                                    />
-                                </View>
-                                <View style={styles.headerTextContainer}>
-                                    <Text style={styles.helloText}>Hello, {displayName}</Text>
-                                    <Text style={styles.subGreetingText}>{getGreeting()}</Text>
-                                </View>
+                        <View style={styles.profileSection}>
+                            <View style={styles.avatarBorder}>
+                                <Image
+                                    source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200' }}
+                                    style={styles.avatar}
+                                />
                             </View>
-                            <TouchableOpacity style={styles.notificationButton} onPress={() => router.push('/(tabs)/transactions' as any)}>
-                                <Ionicons name="notifications-outline" size={22} color="#fff" />
-                            </TouchableOpacity>
+                            <Text style={styles.greetingText}>{getGreeting()}, {displayName} 👋</Text>
                         </View>
 
                         {/* White Curved Card for Business Name */}
@@ -195,53 +187,51 @@ export default function BusinessDashboardScreen() {
                     </LinearGradient>
                 </View>
 
-                {/* Summary Section styled like the provided design (CoA-based values) */}
+                {/* Summary Section (CoA-based: this month revenue, expenses, net) */}
                 <View style={styles.summarySection}>
                     <View style={styles.summaryCard}>
-                        <Text style={styles.summaryTitle}>Todays Summary</Text>
-                        <Text style={styles.balanceLabel}>Your Balance</Text>
+                        <Text style={styles.summaryHeader}>This month (from Chart of Accounts)</Text>
                         {loading ? (
-                            <ActivityIndicator size="small" color="#1e3a8a" style={{ marginTop: 8 }} />
+                            <View style={styles.summaryRow}>
+                                <ActivityIndicator size="small" color="#1e3a8a" style={{ flex: 1 }} />
+                            </View>
                         ) : (
                             <>
-                                <Text style={styles.balanceValue}>
-                                    {formatCurrency(summary?.netIncome ?? 0)}
-                                </Text>
-
-                                {/* Income / Expenses row */}
                                 <View style={styles.summaryRow}>
                                     <View style={styles.summaryItem}>
                                         <View style={styles.summaryValueContainer}>
-                                            <Ionicons name="arrow-up" size={16} color="#16a34a" />
-                                            <Text style={[styles.currencyValue, { marginLeft: 4 }]}>{formatCurrency(summary?.revenue ?? 0)}</Text>
+                                            <Text style={styles.emoji}>💰</Text>
+                                            <Text style={styles.currencyValue}>{formatCurrency(summary?.revenue ?? 0)}</Text>
                                         </View>
-                                        <Text style={styles.summaryLabel}>Income</Text>
+                                        <Text style={styles.summaryLabel}>Revenue</Text>
                                     </View>
                                     <View style={styles.summaryItem}>
                                         <View style={styles.summaryValueContainer}>
-                                            <Ionicons name="arrow-down" size={16} color="#ef4444" />
-                                            <Text style={[styles.currencyValue, { marginLeft: 4 }]}>{formatCurrency(summary?.expenses ?? 0)}</Text>
+                                            <Text style={styles.emoji}>💸</Text>
+                                            <Text style={styles.currencyValue}>{formatCurrency(summary?.expenses ?? 0)}</Text>
                                         </View>
                                         <Text style={styles.summaryLabel}>Expenses</Text>
                                     </View>
-                                </View>
-
-                                {/* Extra balances from Chart of Accounts */}
-                                <View style={[styles.summaryRow, { marginTop: 12 }]}>
-                                    <View style={styles.secondarySummaryItem}>
-                                        <Text style={styles.secondaryLabel}>Cash & Bank</Text>
-                                        <Text style={styles.secondaryValue}>{formatCurrency(summary?.cashBankBalance ?? 0)}</Text>
+                                    <View style={styles.summaryItem}>
+                                        <View style={styles.summaryValueContainer}>
+                                            <Text style={styles.emoji}>📊</Text>
+                                            <Text style={[styles.currencyValue, { color: (summary?.netIncome ?? 0) >= 0 ? '#10b981' : '#ef4444' }]}>
+                                                {formatCurrency(summary?.netIncome ?? 0)}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.summaryLabel}>Net</Text>
                                     </View>
-                                    <View style={styles.secondarySummaryItem}>
-                                        <Text style={styles.secondaryLabel}>Receivables</Text>
-                                        <Text
-                                            style={[
-                                                styles.secondaryValue,
-                                                { color: (summary?.arBalance ?? 0) > 0 ? '#f59e0b' : '#64748b' },
-                                            ]}
-                                        >
+                                </View>
+                                <View style={[styles.summaryRow, { marginTop: 10 }]}>
+                                    <View style={styles.summaryItem}>
+                                        <Text style={styles.currencyValue}>{formatCurrency(summary?.cashBankBalance ?? 0)}</Text>
+                                        <Text style={styles.summaryLabel}>Cash & Bank</Text>
+                                    </View>
+                                    <View style={styles.summaryItem}>
+                                        <Text style={[styles.currencyValue, { color: (summary?.arBalance ?? 0) > 0 ? '#f59e0b' : '#64748b' }]}>
                                             {formatCurrency(summary?.arBalance ?? 0)}
                                         </Text>
+                                        <Text style={styles.summaryLabel}>Receivables</Text>
                                     </View>
                                 </View>
                             </>
@@ -267,61 +257,35 @@ export default function BusinessDashboardScreen() {
                     </View>
                 )}
 
-                {/* Action Carousel — Cash Sale, Credit Sale, Write Cheque all post to Chart of Accounts */}
-                <View style={styles.actionsSection}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.actionsScrollContent}
+                {/* Action Buttons Row — Cash Sale and Credit Sale post to Chart of Accounts (AR, Revenue, Cash/Bank) */}
+                <View style={[styles.actionsRow, { flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }]}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/business-tabs/sales/cash-sale')}
                     >
-                        <ActionCard
-                            title="Cash Sale"
-                            subtitle="Record walk-in payments"
-                            icon="cash-outline"
-                            colors={['#22c55e', '#16a34a']}
-                            onPress={() => router.push('/business-tabs/sales/cash-sale')}
-                        />
-                        <ActionCard
-                            title="Credit sale"
-                            subtitle="Issue an invoice"
-                            icon="card-outline"
-                            colors={['#2563eb', '#1d4ed8']}
-                            onPress={() => router.push('/create-invoice')}
-                        />
-                        <ActionCard
-                            title="Write Cheque"
-                            subtitle="Pay with a cheque"
-                            icon="document-text-outline"
-                            colors={['#f97316', '#ea580c']}
-                            onPress={() => router.push('/write-cheque')}
-                        />
-                        <ActionCard
-                            title="Add Item"
-                            subtitle="Create a new product or service"
-                            icon="add-circle-outline"
-                            colors={['#4f46e5', '#6366f1']}
-                            onPress={() => router.push('/new-inventory-item')}
-                        />
-                        <ActionCard
-                            title="Write Bill"
-                            subtitle="Record a supplier bill"
-                            icon="receipt-outline"
-                            colors={['#0ea5e9', '#0284c7']}
-                            onPress={() => router.push('/bill-entry')}
-                        />
-                        <ActionCard
-                            title="Write Journal"
-                            subtitle="Post manual journal entries"
-                            icon="book-outline"
-                            colors={['#facc15', '#eab308']}
-                            onPress={() => router.push('/business-tabs/more-business')}
-                        />
-                    </ScrollView>
-                    {/* Static dots to mimic the design's pager indicator */}
-                    <View style={styles.carouselDots}>
-                        <View style={[styles.carouselDot, styles.carouselDotActive]} />
-                        <View style={styles.carouselDot} />
-                    </View>
+                        <Text style={styles.actionButtonText}>Cash Sale</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/create-invoice')}
+                    >
+                        <Text style={styles.actionButtonText}>Credit Sale</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/add-expense')}
+                    >
+                        <Text style={styles.actionButtonText}>Add Expense</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, { width: '48%' }]}
+                        onPress={() => router.push('/write-cheque')}
+                    >
+                        <Text style={styles.actionButtonText}>Create Cheque</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Management Grid */}
@@ -380,36 +344,6 @@ export default function BusinessDashboardScreen() {
     );
 }
 
-function ActionCard({
-    title,
-    subtitle,
-    icon,
-    colors,
-    onPress,
-}: {
-    title: string;
-    subtitle: string;
-    icon: any;
-    colors: [string, string];
-    onPress: () => void;
-}) {
-    return (
-        <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.actionCardWrapper}>
-            <LinearGradient colors={colors} style={styles.actionCard}>
-                <View style={styles.actionCardIconCircle}>
-                    <Ionicons name={icon} size={26} color="#fff" />
-                </View>
-                <View style={styles.actionCardTextContainer}>
-                    <Text style={styles.actionCardTitle}>{title}</Text>
-                    <Text style={styles.actionCardSubtitle} numberOfLines={2}>
-                        {subtitle}
-                    </Text>
-                </View>
-            </LinearGradient>
-        </TouchableOpacity>
-    );
-}
-
 function GridItem({ emoji, label, onPress }: { emoji: string; label: string; onPress?: () => void }) {
     return (
         <TouchableOpacity style={styles.gridItem} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
@@ -435,19 +369,13 @@ const styles = StyleSheet.create({
     headerGradient: {
         flex: 1,
         paddingTop: 40,
+        alignItems: 'center',
         borderBottomLeftRadius: 40,
         borderBottomRightRadius: 40,
-        paddingHorizontal: 20,
-    },
-    headerTopRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 24,
     },
     profileSection: {
-        flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: 20,
     },
     avatarBorder: {
         width: 80,
@@ -460,32 +388,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#fff',
     },
-    headerTextContainer: {
-        marginLeft: 12,
-    },
-    helloText: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#ffffff',
-    },
-    subGreetingText: {
-        marginTop: 4,
-        fontSize: 13,
-        color: '#e5e7eb',
-    },
-    notificationButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: '#ffffff55',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     avatar: {
         width: 74,
         height: 74,
         borderRadius: 37,
+    },
+    greetingText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#f59e0b',
+        marginTop: 12,
     },
     businessCard: {
         position: 'absolute',
@@ -516,18 +428,6 @@ const styles = StyleSheet.create({
     summarySection: {
         marginTop: 40,
         paddingHorizontal: 15,
-    },
-    summaryTitle: {
-        textAlign: 'center',
-        fontSize: 12,
-        color: '#64748b',
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    balanceLabel: {
-        textAlign: 'center',
-        fontSize: 11,
-        color: '#94a3b8',
     },
     countsSection: {
         flexDirection: 'row',
@@ -569,13 +469,12 @@ const styles = StyleSheet.create({
         shadowRadius: 5,
         elevation: 2,
     },
-    balanceValue: {
+    summaryHeader: {
         textAlign: 'center',
-        fontSize: 24,
-        fontWeight: '800',
+        fontSize: 12,
         color: '#1e3a8a',
-        marginTop: 6,
-        marginBottom: 16,
+        fontWeight: '600',
+        marginBottom: 15,
     },
     summaryRow: {
         flexDirection: 'row',
@@ -612,75 +511,24 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#64748b',
     },
-    secondarySummaryItem: {
-        flex: 1,
-        paddingHorizontal: 8,
-    },
-    secondaryLabel: {
-        fontSize: 10,
-        color: '#94a3b8',
-        marginBottom: 2,
-    },
-    secondaryValue: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#1e293b',
-    },
-    actionsSection: {
-        marginTop: 24,
-    },
-    actionsScrollContent: {
+    actionsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingRight: 30,
+        marginTop: 25,
     },
-    actionCardWrapper: {
-        marginRight: 12,
-    },
-    actionCard: {
-        width: width * 0.75,
-        borderRadius: 18,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    actionCardIconCircle: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
-        backgroundColor: '#ffffff22',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    actionCardTextContainer: {
-        flex: 1,
-    },
-    actionCardTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#ffffff',
-        marginBottom: 4,
-    },
-    actionCardSubtitle: {
-        fontSize: 11,
-        color: '#e5e7eb',
-    },
-    carouselDots: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 10,
-    },
-    carouselDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        backgroundColor: '#cbd5f5',
-        marginHorizontal: 3,
-    },
-    carouselDotActive: {
-        width: 14,
+    actionButton: {
         backgroundColor: '#1e3a8a',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        width: (width - 60) / 3,
+        alignItems: 'center',
+    },
+    actionButtonText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600',
     },
     gridContainer: {
         marginTop: 25,

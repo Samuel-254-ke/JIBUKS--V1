@@ -80,7 +80,17 @@ router.get('/profit-loss', async (req, res) => {
         }
 
         const { startDate, endDate } = parseDateRange(req.query);
-        console.log(`[P&L] Generating report for tenant ${tenantId}, period: ${startDate} to ${endDate}`);
+        console.log(`[P&L] Request Details:`, {
+            tenantId,
+            query: req.query,
+            parsedStart: startDate,
+            parsedEnd: endDate,
+            validDates: !isNaN(startDate) && !isNaN(endDate)
+        });
+
+        if (isNaN(startDate) || isNaN(endDate)) {
+            return res.status(400).json({ error: 'Invalid date format provided' });
+        }
 
         const profitLoss = await getProfitAndLoss(tenantId, startDate, endDate);
         console.log(`[P&L] Report generated successfully:`, {
@@ -98,10 +108,10 @@ router.get('/profit-loss', async (req, res) => {
         });
     } catch (error) {
         console.error('[P&L] Error generating P&L:', error);
-        console.error('[P&L] Error stack:', error.stack);
         res.status(500).json({
             error: 'Failed to generate profit & loss statement',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });

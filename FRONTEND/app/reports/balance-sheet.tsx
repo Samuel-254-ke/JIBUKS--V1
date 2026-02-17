@@ -25,7 +25,7 @@ export default function BalanceSheetScreen() {
     );
     // Sub-sections can be toggled separately if needed, or just grouped.
     const [expandedSubSections, setExpandedSubSections] = useState<Set<string>>(
-        new Set(['currentAssets', 'nonCurrentAssets', 'currentLiabilities', 'longTermLiabilities'])
+        new Set(['currentAssets', 'nonCurrentAssets', 'accountsPayable', 'currentLiabilities', 'longTermLiabilities'])
     );
 
     useEffect(() => {
@@ -261,7 +261,28 @@ export default function BalanceSheetScreen() {
 
                         {expandedSections.has('LIABILITIES') && (
                             <View>
-                                {/* Current Liabilities */}
+                                {/* Accounts Payable */}
+                                <TouchableOpacity
+                                    style={styles.subSectionHeaderRow}
+                                    onPress={() => toggleSubSection('accountsPayable')}
+                                >
+                                    <View style={styles.sectionTitleContainer}>
+                                        <Ionicons
+                                            name={expandedSubSections.has('accountsPayable') ? "caret-down" : "caret-forward"}
+                                            size={14}
+                                            color="#6b7280"
+                                        />
+                                        <Text style={styles.subSectionTitle}>Accounts Payable</Text>
+                                    </View>
+                                    <Text style={styles.subSectionAmount}>{formatCurrency(liabilities.accountsPayable?.total || 0)}</Text>
+                                </TouchableOpacity>
+                                {expandedSubSections.has('accountsPayable') && (
+                                    <View style={styles.indentBlock}>
+                                        {renderItems(liabilities.accountsPayable?.items)}
+                                    </View>
+                                )}
+
+                                {/* Other Current Liabilities */}
                                 <TouchableOpacity
                                     style={styles.subSectionHeaderRow}
                                     onPress={() => toggleSubSection('currentLiabilities')}
@@ -272,7 +293,7 @@ export default function BalanceSheetScreen() {
                                             size={14}
                                             color="#6b7280"
                                         />
-                                        <Text style={styles.subSectionTitle}>Current Liabilities</Text>
+                                        <Text style={styles.subSectionTitle}>Other Current Liabilities</Text>
                                     </View>
                                     <Text style={styles.subSectionAmount}>{formatCurrency(liabilities.currentLiabilities?.total || 0)}</Text>
                                 </TouchableOpacity>
