@@ -30,7 +30,7 @@ jobs:
           ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
 
           # SSH into server and deploy
-          ssh -i deploy_key.pem "$SSH_USER@$SERVER_IP" << 'EOF'
+          ssh -i deploy_key.pem "$SSH_USER@$SERVER_IP" << EOF
             cd "$PROJECT_PATH"
             git pull origin main
             docker compose down
@@ -39,5 +39,3 @@ jobs:
 
           # Cleanup
           rm -f deploy_key.pem
-
-          #server IP UPDATED
