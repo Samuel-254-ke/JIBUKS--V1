@@ -82,6 +82,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
+    message: 'JIBUKS backend – running successfully on Contabo',
     timestamp: new Date().toISOString(),
     network: {
       localIP: LOCAL_IP,
