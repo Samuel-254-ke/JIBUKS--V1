@@ -31,6 +31,9 @@ jobs:
 
           # SSH into server and deploy
           ssh -i deploy_key.pem "$SSH_USER@$SERVER_IP" << EOF
+            # Fix dubious ownership warning
+            git config --global --add safe.directory "$PROJECT_PATH"
+
             cd "$PROJECT_PATH"
             git pull origin main
             docker compose down
