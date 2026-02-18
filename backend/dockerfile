@@ -1,0 +1,32 @@
+# Use Node.js 18 Alpine as base image (lightweight)
+FROM node:18-alpine
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy package files first (for Docker layer caching)
+# If package.json doesn't change, Docker won't reinstall dependencies
+COPY package*.json ./
+
+# Install ALL dependencies (including devDependencies for prisma CLI)
+RUN npm install
+
+# Copy Prisma schema before generating client
+COPY prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy the rest of the backend source code
+COPY src ./src/
+COPY scripts ./scripts/
+COPY public ./public/
+
+# Copy environment example (actual .env will be passed at runtime)
+COPY .env.example ./
+
+# Expose the port your backend runs on
+EXPOSE 4400
+
+# Start the backend server
+CMD ["node", "src/server.js"]

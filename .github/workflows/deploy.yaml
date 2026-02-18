@@ -1,0 +1,41 @@
+name: Deploy Backend to Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          PROJECT_PATH: ${{ secrets.PROJECT_PATH }}
+        run: |
+          # Write private key to a file
+          echo "$SSH_KEY" | tr -d '\r' > deploy_key.pem
+          chmod 600 deploy_key.pem
+
+          # Prepare known_hosts to avoid interactive prompt
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
+
+          # SSH into server and deploy
+          ssh -i deploy_key.pem "$SSH_USER@$SERVER_IP" << 'EOF'
+            cd "$PROJECT_PATH"
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+          EOF
+
+          # Cleanup
+          rm -f deploy_key.pem

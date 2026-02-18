@@ -25,27 +25,16 @@ export default function CustomersScreen() {
     const [showModal, setShowModal] = useState(false);
     const [businessTypeFilter, setBusinessTypeFilter] = useState('');
 
-    // New customer form
+    // New customer form — only crucial fields aligned with backend CoA (AR/invoicing)
     const [formData, setFormData] = useState({
         name: '',
         companyName: '',
         email: '',
         phone: '',
-        alternatePhone: '',
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        country: 'Kenya',
         paymentTerms: 'Net 30',
         creditLimit: '',
         taxNumber: '',
-        taxId: '',
-        website: '',
-        contactPerson: '',
-        position: '',
         businessType: '',
-        industry: '',
         notes: '',
     });
 
@@ -85,7 +74,19 @@ export default function CustomersScreen() {
         }
 
         try {
-            await apiService.createCustomer(formData);
+            // Only send crucial fields to backend (aligned with CoA/AR invoicing)
+            const payload = {
+                name: formData.name.trim(),
+                companyName: formData.companyName.trim() || undefined,
+                email: formData.email.trim() || undefined,
+                phone: formData.phone.trim() || undefined,
+                paymentTerms: formData.paymentTerms || 'Net 30',
+                creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : undefined,
+                taxNumber: formData.taxNumber.trim() || undefined,
+                businessType: formData.businessType || undefined,
+                notes: formData.notes.trim() || undefined,
+            };
+            await apiService.createCustomer(payload);
             Alert.alert('Success', 'Customer created successfully');
             setShowModal(false);
             setFormData({
@@ -93,21 +94,10 @@ export default function CustomersScreen() {
                 companyName: '',
                 email: '',
                 phone: '',
-                alternatePhone: '',
-                address: '',
-                city: '',
-                state: '',
-                zipCode: '',
-                country: 'Kenya',
                 paymentTerms: 'Net 30',
                 creditLimit: '',
                 taxNumber: '',
-                taxId: '',
-                website: '',
-                contactPerson: '',
-                position: '',
                 businessType: '',
-                industry: '',
                 notes: '',
             });
             loadCustomers();
@@ -225,7 +215,7 @@ export default function CustomersScreen() {
                             </Text>
                         </View>
                     ) : (
-                        filteredCustomers.map((customer) => (
+                        filteredCustomers.map((customer: any) => (
                             <TouchableOpacity
                                 key={customer.id}
                                 style={styles.customerCard}
@@ -243,16 +233,10 @@ export default function CustomersScreen() {
                                             <Text style={styles.customerName}>
                                                 {customer.companyName || customer.name}
                                             </Text>
-                                            {customer.companyName && customer.name && (
-                                                <Text style={styles.customerContact}>
-                                                    Contact: {customer.name}
+                                            {(customer.phone || customer.email) && (
+                                                <Text style={styles.customerContact} numberOfLines={1}>
+                                                    {[customer.phone, customer.email].filter(Boolean).join(' · ')}
                                                 </Text>
-                                            )}
-                                            {customer.email && (
-                                                <Text style={styles.customerEmail}>{customer.email}</Text>
-                                            )}
-                                            {customer.phone && (
-                                                <Text style={styles.customerPhone}>{customer.phone}</Text>
                                             )}
                                         </View>
                                         <View style={styles.customerStatus}>
@@ -365,7 +349,7 @@ export default function CustomersScreen() {
                             <Text style={styles.label}>Company Name</Text>
                             <TextInput
                                 style={styles.modalInput}
-                                placeholder="Company or business name"
+                                placeholder="Company or business name (for invoices)"
                                 value={formData.companyName}
                                 onChangeText={(value) => setFormData({ ...formData, companyName: value })}
                             />
@@ -386,22 +370,6 @@ export default function CustomersScreen() {
                                 value={formData.phone}
                                 onChangeText={(value) => setFormData({ ...formData, phone: value })}
                                 keyboardType="phone-pad"
-                            />
-
-                            <Text style={styles.label}>Address</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                placeholder="Street address"
-                                value={formData.address}
-                                onChangeText={(value) => setFormData({ ...formData, address: value })}
-                            />
-
-                            <Text style={styles.label}>City</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                placeholder="City"
-                                value={formData.city}
-                                onChangeText={(value) => setFormData({ ...formData, city: value })}
                             />
 
                             <Text style={styles.label}>Business Type</Text>
@@ -444,7 +412,7 @@ export default function CustomersScreen() {
                                 keyboardType="numeric"
                             />
 
-                            <Text style={styles.label}>Tax Number (Optional)</Text>
+                            <Text style={styles.label}>Tax Number (VAT/Tax ID)</Text>
                             <TextInput
                                 style={styles.modalInput}
                                 placeholder="VAT/Tax ID Number"
@@ -455,7 +423,7 @@ export default function CustomersScreen() {
                             <Text style={styles.label}>Notes</Text>
                             <TextInput
                                 style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
-                                placeholder="Additional notes about this customer..."
+                                placeholder="Additional notes..."
                                 value={formData.notes}
                                 onChangeText={(value) => setFormData({ ...formData, notes: value })}
                                 multiline
