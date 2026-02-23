@@ -58,7 +58,11 @@ const buildCorsOrigins = () => {
   ];
 
   return process.env.NODE_ENV === 'production'
-    ? ['https://your-production-domain.com']
+    ? [
+        'https://jibuksapi.apbcafrica.com',
+        //'https://jibuks.apbcafrica.com',   // if you have a web app
+        null,                               // mobile apps often send Origin: null
+      ]
     : origins;
 };
 
@@ -66,7 +70,7 @@ const buildCorsOrigins = () => {
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://your-production-domain.com']
+    ? buildCorsOrigins()
     : true, // Allow all origins in development
   credentials: true
 }));

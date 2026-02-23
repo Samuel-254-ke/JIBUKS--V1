@@ -49,7 +49,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d7d79549-f11b-482c-8a6b-a3f58198a2bc"
+        "projectId": "d7d79549-f11b-482c-8a6b-a3f58198a2bc",
+        "EXPO_PUBLIC_API_URL": "https://jibuksapi.apbcafrica.com/api"
       }
     },
     "owner": "samueldev254"
