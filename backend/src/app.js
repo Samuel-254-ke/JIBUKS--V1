@@ -38,7 +38,7 @@ const PORT = process.env.PORT || '4001';
 
 // Build dynamic CORS origins
 const buildCorsOrigins = () => {
-  const origins = [
+  const developmentOrigins = [
     // Localhost for iOS simulator and web
     'http://localhost:4001',
     'http://localhost:8081',
@@ -57,21 +57,35 @@ const buildCorsOrigins = () => {
     `exp://${LOCAL_IP}:8081`,
   ];
 
-  return process.env.NODE_ENV === 'production'
-    ? [
-        'https://jibuksapi.apbcafrica.com',
-        //'https://jibuks.apbcafrica.com',   // if you have a web app
-        null,                               // mobile apps often send Origin: null
-      ]
-    : origins;
+  const productionOrigins = [
+    'https://jibuksapi.apbcafrica.com',
+    'https://jibuks.apbcafrica.com', // web app if available
+    null, // mobile apps often send Origin: null
+  ];
+
+  return process.env.NODE_ENV === 'production' ? productionOrigins : developmentOrigins;
 };
 
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? buildCorsOrigins()
-    : true, // Allow all origins in development
+  origin: (origin, callback) => {
+    const allowedOrigins = buildCorsOrigins();
+    console.log('🌐 CORS check - Origin:', origin, 'Allowed:', allowedOrigins.includes(origin));
+    
+    // Allow requests with no origin (mobile apps) or allowed origins
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    console.error('❌ CORS blocked origin:', origin);
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
@@ -81,6 +95,18 @@ app.use(morgan('combined'));
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Request logging for debugging
+app.use((req, res, next) => {
+  console.log('📥 Request:', {
+    method: req.method,
+    url: req.url,
+    origin: req.headers.origin,
+    userAgent: req.headers['user-agent'],
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {

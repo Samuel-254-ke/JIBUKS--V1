@@ -5,7 +5,13 @@ import Constants from 'expo-constants';
 // Get environment variables
 const getEnvVar = (key: string, defaultValue: string = ''): string => {
   // @ts-ignore - Expo injects these at build time
-  return Constants.expoConfig?.extra?.[key] || process.env[key] || defaultValue;
+  const value = Constants.expoConfig?.extra?.[key] || 
+                Constants.expoConfig?.extra?.eas?.[key] || 
+                process.env[key] || 
+                defaultValue;
+  
+  console.log(`🔧 Environment variable ${key}:`, value);
+  return value;
 };
 
 const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '192.168.1.69');
@@ -13,20 +19,25 @@ const API_PORT = getEnvVar('EXPO_PUBLIC_API_PORT', '4400');
 
 // Build API base URL based on platform
 const getBaseUrl = (): string => {
-  // If full URL is provided, use it
+  // First priority: Check for full production URL
   const fullUrl = getEnvVar('EXPO_PUBLIC_API_URL');
   if (fullUrl) {
+    console.log('✅ Using production API URL:', fullUrl);
     return fullUrl;
   }
 
-  // Otherwise, construct URL based on platform
+  // Development fallback: construct URL based on platform
+  console.log('⚠️  No production URL found, using development configuration');
+  
   if (Platform.OS === 'android') {
     // Check if running on emulator or physical device
     // Emulator: use 10.0.2.2
     // Physical device: use local network IP
     const isEmulator = Constants.isDevice === false;
     const host = isEmulator ? '10.0.2.2' : LOCAL_IP;
-    return `http://${host}:${API_PORT}/api`;
+    const url = `http://${host}:${API_PORT}/api`;
+    console.log('🤖 Android URL:', url, isEmulator ? '(emulator)' : '(device)');
+    return url;
   }
 
   if (Platform.OS === 'ios') {
@@ -34,11 +45,15 @@ const getBaseUrl = (): string => {
     // Physical device uses local network IP
     const isSimulator = Constants.isDevice === false;
     const host = isSimulator ? 'localhost' : LOCAL_IP;
-    return `http://${host}:${API_PORT}/api`;
+    const url = `http://${host}:${API_PORT}/api`;
+    console.log('🍎 iOS URL:', url, isSimulator ? '(simulator)' : '(device)');
+    return url;
   }
 
   // Web uses localhost
-  return `http://localhost:${API_PORT}/api`;
+  const url = `http://localhost:${API_PORT}/api`;
+  console.log('🌐 Web URL:', url);
+  return url;
 };
 
 const API_BASE_URL = getBaseUrl();
@@ -262,7 +277,15 @@ class ApiService {
     }
 
     try {
-      console.log(`📡 ${options.method || 'GET'} ${url}`);
+      console.log(`📡 API Request Details:`, {
+        method: options.method || 'GET',
+        url: url,
+        baseUrl: this.baseUrl,
+        endpoint: endpoint,
+        headers: headers,
+        bodyType: typeof options.body,
+        hasBody: !!options.body
+      });
 
       const response = await fetch(url, {
         ...options,
@@ -274,13 +297,32 @@ class ApiService {
         },
       });
 
+      console.log(`📲 API Response:`, {
+        url: url,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: response.headers
+      });
+
       const data = await response.json() as { error?: string };
 
       if (!response.ok) {
+        console.error('❌ API Error Response:', {
+          url: url,
+          status: response.status,
+          error: data.error,
+          data: data
+        });
         throw {
           error: data.error || 'An error occurred',
         } as ApiError;
       }
+
+      console.log('✅ API Success:', {
+        url: url,
+        status: response.status
+      });
 
       return data as T;
     } catch (error: any) {
