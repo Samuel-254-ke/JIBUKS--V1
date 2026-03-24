@@ -1,6 +1,10 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, AppStateStatus } from 'react-native';
 import apiService, { User, LoginCredentials, RegisterData, ApiError } from '../services/api';
+
+const SESSION_TIMEOUT_MS = 10 * 60 * 1000;
+const LAST_ACTIVE_AT_KEY = 'lastActiveAt';
 
 // Types
 interface AuthContextType {
@@ -29,11 +33,49 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   // Load stored auth on app start
   useEffect(() => {
     loadStoredAuth();
   }, []);
+
+  // Enforce 10-minute session timeout when app returns from background
+  useEffect(() => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      const prevAppState = appStateRef.current;
+
+      if (prevAppState === 'active' && (nextAppState === 'background' || nextAppState === 'inactive')) {
+        await AsyncStorage.setItem(LAST_ACTIVE_AT_KEY, Date.now().toString());
+      }
+
+      if ((prevAppState === 'inactive' || prevAppState === 'background') && nextAppState === 'active') {
+        try {
+          const lastActiveAtRaw = await AsyncStorage.getItem(LAST_ACTIVE_AT_KEY);
+
+          if (lastActiveAtRaw && user) {
+            const lastActiveAt = Number(lastActiveAtRaw);
+            const awayDuration = Date.now() - lastActiveAt;
+
+            if (awayDuration >= SESSION_TIMEOUT_MS) {
+              await apiService.logout();
+              setUser(null);
+            }
+          }
+        } catch (appStateError) {
+          console.error('Session timeout check failed:', appStateError);
+        }
+      }
+
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [user]);
 
   const loadStoredAuth = async () => {
     try {
@@ -61,6 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const response = await apiService.login(credentials);
       setUser(response.user);
+      await AsyncStorage.setItem(LAST_ACTIVE_AT_KEY, Date.now().toString());
     } catch (error) {
       const apiError = error as ApiError;
       setError(apiError.error);
@@ -77,6 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const response = await apiService.register(data);
       setUser(response.user);
+      await AsyncStorage.setItem(LAST_ACTIVE_AT_KEY, Date.now().toString());
     } catch (error) {
       const apiError = error as ApiError;
       setError(apiError.error);
@@ -93,6 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      await AsyncStorage.removeItem(LAST_ACTIVE_AT_KEY);
       setUser(null);
       setIsLoading(false);
     }
