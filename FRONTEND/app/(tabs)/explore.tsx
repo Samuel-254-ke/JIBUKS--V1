@@ -7,14 +7,22 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { logout, isLoading } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = React.useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
 
   const settingsCategories = [
     {
@@ -141,10 +149,15 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={() => router.push('/login' as any)}
+            onPress={handleLogout}
+            disabled={isLoading}
           >
-            <Ionicons name="log-out" size={20} color="#ef4444" />
-            <Text style={styles.logoutText}>Logout</Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#ef4444" />
+            ) : (
+              <Ionicons name="log-out" size={20} color="#ef4444" />
+            )}
+            <Text style={styles.logoutText}>{isLoading ? 'Logging out...' : 'Logout'}</Text>
           </TouchableOpacity>
         </View>
 
