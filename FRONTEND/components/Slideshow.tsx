@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, Image, Dimensions, ScrollView, TouchableOpacity
 import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'expo-router'
 import { useAuth } from '@/contexts/AuthContext'
+import { getAuthenticatedHomeRoute } from '@/utils/authRouting'
 
 const { width } = Dimensions.get('window')
 
@@ -14,7 +15,7 @@ const Slideshow = () => {
   // Redirect to dashboard if already logged in
   useEffect(() => {
     if (!isInitializing && user) {
-      router.replace('/(tabs)')
+      router.replace(getAuthenticatedHomeRoute(user))
     }
   }, [user, isInitializing])
 
