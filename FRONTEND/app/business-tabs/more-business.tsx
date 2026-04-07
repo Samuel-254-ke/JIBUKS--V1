@@ -6,11 +6,14 @@ import {
     ScrollView,
     TouchableOpacity,
     Dimensions,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +31,7 @@ const MENU_ITEMS: { id: string; label: string; icon: string; route?: string }[] 
 
 export default function MoreBusinessScreen() {
     const router = useRouter();
+    const { logout, isLoading } = useAuth();
 
     const onMenuItemPress = (item: typeof MENU_ITEMS[0]) => {
         if (item.route) {
@@ -58,6 +62,24 @@ export default function MoreBusinessScreen() {
         router.back();
     };
 
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to log out?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await logout();
+                        router.replace('/login');
+                    },
+                },
+            ]
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             {/* Blue Header Section */}
@@ -82,6 +104,21 @@ export default function MoreBusinessScreen() {
                 {/* Menu Card Inner */}
                 <View style={styles.menuListInner}>
                     {MENU_ITEMS.map((item, index) => renderMenuItem(item, index))}
+                </View>
+
+                <View style={styles.logoutSection}>
+                    <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={handleLogout}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <ActivityIndicator size="small" color="#ef4444" />
+                        ) : (
+                            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                        )}
+                        <Text style={styles.logoutText}>{isLoading ? 'Logging out...' : 'Logout'}</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Footer */}
@@ -169,6 +206,25 @@ const styles = StyleSheet.create({
     separator: {
         height: 1,
         backgroundColor: '#f1f5f9',
+    },
+    logoutSection: {
+        marginTop: 24,
+    },
+    logoutButton: {
+        backgroundColor: '#fff1f2',
+        borderWidth: 1,
+        borderColor: '#fecdd3',
+        borderRadius: 12,
+        paddingVertical: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        flexDirection: 'row',
+    },
+    logoutText: {
+        color: '#ef4444',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
     },
     footer: {
         marginTop: 40,
