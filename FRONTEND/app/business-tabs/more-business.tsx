@@ -7,13 +7,13 @@ import {
     TouchableOpacity,
     Dimensions,
     ActivityIndicator,
-    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { confirmAndLogout } from '@/utils/logout';
 
 const { width } = Dimensions.get('window');
 
@@ -63,21 +63,7 @@ export default function MoreBusinessScreen() {
     };
 
     const handleLogout = () => {
-        Alert.alert(
-            'Logout',
-            'Are you sure you want to log out?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Logout',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await logout();
-                        router.replace('/login');
-                    },
-                },
-            ]
-        );
+        confirmAndLogout(logout, router.replace);
     };
 
     return (
