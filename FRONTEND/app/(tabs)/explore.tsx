@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { confirmAndLogout } from '@/utils/logout';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -20,8 +21,7 @@ export default function SettingsScreen() {
   const [darkModeEnabled, setDarkModeEnabled] = React.useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    router.replace('/login');
+    confirmAndLogout(logout, router.replace);
   };
 
   const settingsCategories = [

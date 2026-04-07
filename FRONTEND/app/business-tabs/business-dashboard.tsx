@@ -9,7 +9,6 @@ import {
     Image,
     RefreshControl,
     ActivityIndicator,
-    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { confirmAndLogout } from '@/utils/logout';
 
 const ONBOARDING_KEY = 'businessOnboardingComplete';
 
@@ -148,21 +148,7 @@ export default function BusinessDashboardScreen() {
     }, [loadDashboard]);
 
     const handleHeaderLogout = () => {
-        Alert.alert(
-            'Logout',
-            'Are you sure you want to log out?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Logout',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await logout();
-                        router.replace('/login');
-                    },
-                },
-            ]
-        );
+        confirmAndLogout(logout, router.replace);
     };
 
     const displayName = userName || ownerName || 'There';
