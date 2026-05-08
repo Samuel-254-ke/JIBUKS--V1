@@ -612,6 +612,20 @@ class ApiService {
     });
   }
 
+  async createStockTransfer(data: any): Promise<any> {
+    return this.request('/inventory/transfer', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async receiveStock(data: any): Promise<any> {
+    return this.request('/inventory/receive', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Bank Transactions
   async getBankTransactions(params?: any): Promise<any[]> {
     const query = new URLSearchParams();

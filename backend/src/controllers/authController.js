@@ -171,6 +171,15 @@ async function register(req, res, next) {
         console.error('[Auth] Failed to seed suppliers:', supplierError);
         // Don't fail registration if supplier seeding fails
       }
+
+      // Seed Item Types for the new tenant
+      try {
+        const { seedItemTypes } = await import('../services/accountingService.js');
+        await seedItemTypes(tenant.id);
+        console.log(`[Auth] Seeded item types for new tenant ${tenant.id}`);
+      } catch (itemTypeError) {
+        console.error('[Auth] Failed to seed item types:', itemTypeError);
+      }
     }
 
     // Create user record

@@ -248,7 +248,7 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'User is not part of any family' });
         }
 
-        const { code, name, type, description, parentId, currency = 'KES' } = req.body;
+        const { code, name, type, description, parentId, currency = 'KES', detailType } = req.body;
 
         // Validation
         if (!code || !name || !type) {
@@ -287,9 +287,10 @@ router.post('/', async (req, res) => {
         const account = await prisma.account.create({
             data: {
                 tenantId,
-                code,
+                code: String(code),
                 name,
                 type,
+                detailType,
                 description,
                 parentId: parentId ? parseInt(parentId) : null,
                 currency,

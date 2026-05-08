@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import apiService from '@/services/api';
 import { Picker } from '@react-native-picker/picker';
 
@@ -172,13 +173,18 @@ export default function StockAdjustmentScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="close" size={24} color="#1f2937" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Adjust Stock</Text>
-                <View style={{ width: 40 }} />
-            </View>
+            {/* Premium Header */}
+            <LinearGradient colors={['#122f8a', '#1a3bb0']} style={styles.headerGradient}>
+                <SafeAreaView edges={['top']}>
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                            <Ionicons name="close" size={26} color="#fe9900" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Adjust Stock</Text>
+                        <View style={{ width: 40 }} />
+                    </View>
+                </SafeAreaView>
+            </LinearGradient>
 
             <ScrollView
                 style={styles.content}
@@ -318,23 +324,29 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f3f4f6',
     },
+    headerGradient: {
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
+        height: 55,
     },
     backButton: {
-        padding: 4,
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#1f2937',
+        color: '#fe9900',
     },
     content: {
         flex: 1,
@@ -352,7 +364,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#eff6ff',
+        backgroundColor: '#dbe2f0',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
@@ -399,7 +411,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     tabActive: {
-        backgroundColor: '#2563eb',
+        backgroundColor: '#122f8a',
     },
     tabText: {
         fontSize: 13,
@@ -439,7 +451,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textAlign: 'center',
         paddingVertical: 16,
-        color: '#2563eb',
+        color: '#122f8a',
     },
     helperText: {
         fontSize: 12,
@@ -474,7 +486,7 @@ const styles = StyleSheet.create({
         borderTopColor: '#e5e7eb',
     },
     submitButton: {
-        backgroundColor: '#2563eb',
+        backgroundColor: '#fe9900',
         paddingVertical: 14,
         borderRadius: 12,
         alignItems: 'center',
@@ -485,6 +497,6 @@ const styles = StyleSheet.create({
     submitButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: 'bold',
     },
 });

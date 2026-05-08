@@ -101,18 +101,54 @@ async function seedCurrentTenant() {
 
         let suppliersCreated = 0;
         for (const supplier of suppliers) {
-            const existing = await prisma.vendor.findFirst({
+            let vendor = await prisma.vendor.findFirst({
                 where: { tenantId: tenant.id, email: supplier.email }
             });
 
-            if (!existing) {
-                await prisma.vendor.create({
+            if (!vendor) {
+                vendor = await prisma.vendor.create({
                     data: { tenantId: tenant.id, ...supplier }
                 });
                 console.log(`   ✅ Created: ${supplier.name}`);
                 suppliersCreated++;
             } else {
                 console.log(`   ⏭️  Exists: ${supplier.name}`);
+            }
+
+            // Create a sample Expense for history (for autofill)
+            // This ensures the new autofill feature works immediately
+            const lastExp = await prisma.expense.findFirst({
+                where: { tenantId: tenant.id, vendorId: vendor.id }
+            });
+
+            if (!lastExp) {
+                // Determine a logical default account
+                let defaultAccountCode = '5000'; // General Expense
+                if (vendor.name.includes('Power')) defaultAccountCode = '5030'; // Utilities
+                if (vendor.name.includes('Safaricom')) defaultAccountCode = '5030'; // Utilities/Comms
+
+                const account = await prisma.account.findFirst({
+                    where: { tenantId: tenant.id, code: defaultAccountCode }
+                });
+
+                if (account) {
+                    await prisma.expense.create({
+                        data: {
+                            tenantId: tenant.id,
+                            vendorId: vendor.id,
+                            expenseNumber: `INIT-${vendor.id}`,
+                            amount: 1000,
+                            totalAmount: 1160,
+                            vatAmount: 160,
+                            category: account.name,
+                            accountId: account.id,
+                            date: new Date(),
+                            paymentMethod: 'Cash',
+                            description: 'Initial balance / Seeded history'
+                        }
+                    });
+                    console.log(`      💡 Added sample history for ${vendor.name}`);
+                }
             }
         }
 

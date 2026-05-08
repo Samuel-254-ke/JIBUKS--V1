@@ -723,11 +723,16 @@ export const FAMILY_COA_TEMPLATE = [
     // ============================================
     // ADDITIONAL INCOME/REVENUE (4150-4205)
     // ============================================
-    { code: '4150', name: 'Billable Expense Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Reimbursable expense income' },
-    { code: '4160', name: 'Revenue - General', type: 'INCOME', subtype: 'sales_revenue', description: 'General business revenue' },
-    { code: '4170', name: 'Sales - retail', type: 'INCOME', subtype: 'sales_revenue', description: 'Retail sales revenue' },
-    { code: '4180', name: 'Sales - wholesale', type: 'INCOME', subtype: 'sales_revenue', description: 'Wholesale sales revenue' },
-    { code: '4190', name: 'Sales of Product Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Product sales' },
+    { code: '4150', name: 'Billable Expense Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Reimbursable expense income', detailType: 'Service/Fee Income' },
+    { code: '4160', name: 'Revenue - General', type: 'INCOME', subtype: 'sales_revenue', description: 'General business revenue', detailType: 'Revenue - General' },
+    { code: '4170', name: 'Sales - retail', type: 'INCOME', subtype: 'sales_revenue', description: 'Retail sales revenue', detailType: 'Sales - retail' },
+    { code: '4180', name: 'Sales - wholesale', type: 'INCOME', subtype: 'sales_revenue', description: 'Wholesale sales revenue', detailType: 'Sales - wholesale' },
+    { code: '4190', name: 'Sales of Product Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Product sales', detailType: 'Sales of Product Income' },
+    { code: '4191', name: 'Service/Fee Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Standard service income', detailType: 'Service/Fee Income' },
+    { code: '4192', name: 'Discounts/Refunds Given', type: 'INCOME', subtype: 'sales_contra', description: 'Discounts or refunds granted', detailType: 'Discounts/Refunds Given', isContra: true },
+    { code: '4193', name: 'Non-Profit Income', type: 'INCOME', subtype: 'other_income', description: 'Income from non-profit activities', detailType: 'Non-Profit Income' },
+    { code: '4194', name: 'Other Primary Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Other main business income', detailType: 'Other Primary Income' },
+    { code: '4195', name: 'Unapplied Cash Payment Income', type: 'INCOME', subtype: 'other_income', description: 'Cash received but not yet applied', detailType: 'Unapplied Cash Payment Income' },
     { code: '4205', name: 'Uncategorised Income', type: 'INCOME', subtype: 'other_income', description: 'Unclassified income' },
 
     // ============================================
@@ -929,7 +934,7 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
                     name: acc.name,
                     description: acc.description,
                     subtype: acc.subtype,
-                    // We don't update type/conra/system to avoid breaking things, unless necessary
+                    detailType: acc.detailType,
                 },
                 create: {
                     tenantId,
@@ -937,6 +942,7 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
                     name: acc.name,
                     type: acc.type,
                     subtype: acc.subtype,
+                    detailType: acc.detailType,
                     description: acc.description || null,
                     isSystem: acc.isSystem || false,
                     isContra: acc.isContra || false,
@@ -981,7 +987,7 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
 
         console.log(`[AccountingService] Linked ${parentUpdates} parent-child relationships`);
 
-        return accountsToCreate.length;
+        return FAMILY_COA_TEMPLATE.length;
     } catch (error) {
         console.error('[AccountingService] Error seeding CoA:', error);
         throw error;
@@ -2674,12 +2680,46 @@ export async function seedDefaultSuppliers(tenantId) {
     return created;
 }
 
+/**
+ * Seed Item Types for new tenants
+ */
+export async function seedItemTypes(tenantId) {
+    console.log(`[Seeding] Item Types for tenant ${tenantId}...`);
+    const types = [
+        { name: 'Service', code: 'SERVICE' },
+        { name: 'Inventory item', code: 'INVENTORY_ITEM' },
+        { name: 'Non-inventory item', code: 'NON_INVENTORY_ITEM' },
+        { name: 'Bundle', code: 'BUNDLE' }
+    ];
+
+    let created = 0;
+    for (const type of types) {
+        await prisma.itemType.upsert({
+            where: {
+                tenantId_code: { tenantId, code: type.code }
+            },
+            update: {
+                name: type.name
+            },
+            create: {
+                tenantId,
+                name: type.name,
+                code: type.code
+            }
+        });
+        created++;
+    }
+    console.log(`[Seeding] ✅ Seeded ${created} Item Types`);
+    return created;
+}
+
 export default {
     seedFamilyCoA,
     seedFamilyCategories,
     seedFamilyPaymentMethods,
     seedVATRates,
     seedDefaultSuppliers,
+    seedItemTypes,
     getAccountMapping,
     resolveAccountIds,
     createJournalEntry,

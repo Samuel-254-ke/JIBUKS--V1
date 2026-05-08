@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,79 +7,96 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
-    Alert,
-    TextInput,
+    Dimensions,
+    Image,
+    StatusBar,
+    Platform,
+    Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5, FontAwesome } from '@expo/vector-icons';
+import { useRouter, Stack } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import apiService from '@/services/api';
 
-// TypeScript interfaces
-interface InventoryItem {
-    id: number;
-    name: string;
-    sku: string;
-    category: string;
-    quantity: number;
-    unit: string;
-    costPrice: number;
-    sellingPrice: number;
-    stockValue: number;
-    reorderLevel: number;
-    isLowStock: boolean;
-}
+const { width } = Dimensions.get('window');
 
-interface ValuationSummary {
-    totalItems: number;
-    totalCostValue: number;
-    totalRetailValue: number;
-}
+// Brand Colors
+const PRIMARY_BLUE = '#122f8a';
+const ACCENT_ORANGE = '#fe9900';
+const LIGHT_CARD = '#dbe2f0';
+const SUCCESS_GREEN = '#10b981';
+
+// Responsive utility - Perfect 3-column grid calculation
+const gridPadding = 16;
+const gridGap = 12;
+const cardWidth = (width - (gridPadding * 2) - (gridGap * 2)) / 3;
 
 interface ValuationData {
-    summary: ValuationSummary;
+    summary: {
+        totalItems: number;
+        totalCostValue: number;
+        totalRetailValue: number;
+    };
 }
 
-export default function InventoryScreen() {
+export default function StockInventoryScreen() {
     const router = useRouter();
-    const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [valuation, setValuation] = useState<ValuationData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showLowStock, setShowLowStock] = useState(false);
+
+    // Animation State
+    const [statIndex, setStatIndex] = useState(0);
+    const fadeAnim = useRef(new Animated.Value(1)).current;
+    const slideAnim = useRef(new Animated.Value(0)).current;
+
+    const stats = [
+        { label: 'Total Stock Value', value: valuation ? `KES ${Number(valuation.summary.totalCostValue).toLocaleString()}` : 'KES 40,000', color: PRIMARY_BLUE },
+        { label: 'Items Count', value: valuation ? `${valuation.summary.totalItems} Items` : '3 Items', color: PRIMARY_BLUE },
+        { label: 'Low Stock', value: '4 Items', color: '#ff4444', alert: true },
+        { label: 'Expiring Soon', value: '2 Items', color: PRIMARY_BLUE },
+        { label: 'Dead Stock', value: '4 Items', color: '#ff4444', alert: true },
+    ];
 
     useEffect(() => {
-        loadInventory();
-        loadValuation();
-    }, [showLowStock]);
+        loadData();
+    }, []);
 
-    const loadInventory = async () => {
+    // Carousel Timer
+    useEffect(() => {
+        const interval = setInterval(() => {
+            Animated.parallel([
+                Animated.timing(fadeAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+                Animated.timing(slideAnim, { toValue: -15, duration: 400, useNativeDriver: true })
+            ]).start(() => {
+                setStatIndex((prev) => (prev + 1) % stats.length);
+                slideAnim.setValue(15);
+                Animated.parallel([
+                    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+                    Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true })
+                ]).start();
+            });
+        }, 4500);
+
+        return () => clearInterval(interval);
+    }, [valuation]);
+
+    const loadData = async () => {
         try {
             setLoading(true);
-            const endpoint = showLowStock ? '/inventory?lowStock=true' : '/inventory';
-            const data = await apiService.request<InventoryItem[]>(endpoint);
-            setInventory(data || []);
+            const data = await apiService.request<ValuationData>('/inventory/valuation/current');
+            setValuation(data);
         } catch (error) {
-            console.error('Error loading inventory:', error);
-            Alert.alert('Error', 'Failed to load inventory');
+            console.error('Error loading inventory data:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const loadValuation = async () => {
-        try {
-            const data = await apiService.request<ValuationData>('/inventory/valuation/current');
-            setValuation(data);
-        } catch (error) {
-            console.error('Error loading valuation:', error);
-        }
-    };
-
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([loadInventory(), loadValuation()]);
+        await loadData();
         setRefreshing(false);
     };
 
@@ -87,523 +104,464 @@ export default function InventoryScreen() {
         return `KES ${Number(amount).toLocaleString()}`;
     };
 
-    const filteredInventory = inventory.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.sku.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    if (loading) {
+    if (loading && !refreshing) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#1f2937" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Inventory</Text>
-                    <View style={{ width: 40 }} />
-                </View>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#2563eb" />
-                    <Text style={styles.loadingText}>Loading inventory...</Text>
-                </View>
-            </SafeAreaView>
+            <View style={styles.loadingContainer}>
+                <LinearGradient colors={[PRIMARY_BLUE, '#1a3bb0']} style={StyleSheet.absoluteFill} />
+                <ActivityIndicator size="large" color={ACCENT_ORANGE} />
+            </View>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#1f2937" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Inventory</Text>
-                <TouchableOpacity
-                    onPress={() => router.push('/new-inventory-item' as any)}
-                    style={styles.addButton}
-                >
-                    <Ionicons name="add" size={24} color="#fff" />
-                </TouchableOpacity>
-            </View>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" />
+
+            {/* HIDE THE DEFAULT EXPO HEADER */}
+            <Stack.Screen options={{ headerShown: false }} />
+
+            {/* Premium Header */}
+            <LinearGradient colors={[PRIMARY_BLUE, '#1a3bb0']} style={styles.header}>
+                <SafeAreaView edges={['top']}>
+                    <View style={styles.headerContent}>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                            <Ionicons name="chevron-back" size={28} color={ACCENT_ORANGE} />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>STOCK & INVENTORY</Text>
+                        <View style={{ width: 40 }} />
+                    </View>
+                </SafeAreaView>
+            </LinearGradient>
 
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT_ORANGE} />
                 }
             >
-                {/* Valuation Summary */}
-                {valuation && (
+                {/* Visual Section - Luxury Theme */}
+                <View style={styles.visualContainer}>
+                    <LinearGradient
+                        colors={['#1e3a8a', PRIMARY_BLUE, '#0a1a5c']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.premiumCardBg}
+                    >
+                        {/* Decorative Abstract Shapes */}
+                        <View style={[styles.decorativeCircle, { top: -20, right: -20, backgroundColor: 'rgba(254, 153, 0, 0.15)' }]} />
+                        <View style={[styles.decorativeCircle, { bottom: -30, left: -20, width: 120, height: 120, backgroundColor: 'rgba(255, 255, 255, 0.05)' }]} />
+
+                        <View style={styles.cardOverlay}>
+                            <Animated.View style={[
+                                styles.statsPopUpCard,
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                            ]}>
+                                <Text style={[styles.statPopLabel, stats[statIndex].alert && { color: '#ff4444' }]}>
+                                    {stats[statIndex].label}
+                                </Text>
+                                <Text style={[styles.statPopValue, { color: stats[statIndex].color }]}>
+                                    {stats[statIndex].value}
+                                </Text>
+
+                                {/* Progress Indicator */}
+                                <View style={styles.progressContainer}>
+                                    {stats.map((_, i) => (
+                                        <View
+                                            key={i}
+                                            style={[
+                                                styles.progressDot,
+                                                i === statIndex && { width: 14, backgroundColor: ACCENT_ORANGE }
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+                            </Animated.View>
+                        </View>
+                    </LinearGradient>
+                </View>
+
+                {/* Quick Actions Grid - Perfect 3x2 Layout */}
+                <View style={styles.content}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Quick Actions</Text>
+                    </View>
+
+                    <View style={styles.grid}>
+                        <GridItem
+                            label="Add Item"
+                            icon={<View style={styles.complexIcon}>
+                                <MaterialCommunityIcons name="cube-outline" size={38} color={PRIMARY_BLUE} />
+                                <View style={[styles.orderBadge, { top: 14, right: -4 }]}>
+                                    <Ionicons name="add-circle" size={18} color={ACCENT_ORANGE} />
+                                </View>
+                            </View>}
+                            onPress={() => router.push('/new-inventory-item' as any)}
+                        />
+                        <GridItem
+                            label="Receive Stock"
+                            icon={<View style={styles.complexIcon}>
+                                <MaterialCommunityIcons name="truck-fast" size={38} color={ACCENT_ORANGE} />
+                                <View style={[styles.orderBadge, { top: 14, right: -6 }]}>
+                                    <Ionicons name="arrow-down-circle" size={18} color={PRIMARY_BLUE} />
+                                </View>
+                            </View>}
+                            onPress={() => router.push('/receive-stock' as any)}
+                        />
+                        <GridItem
+                            label="Adjust Stock"
+                            icon={<View style={styles.complexIcon}>
+                                <MaterialCommunityIcons name="database-edit" size={38} color={PRIMARY_BLUE} />
+                                <View style={[styles.orderBadge, { top: 14, right: -6 }]}>
+                                    <MaterialCommunityIcons name="cog-refresh" size={18} color={ACCENT_ORANGE} />
+                                </View>
+                            </View>}
+                            onPress={() => router.push('/stock-adjustment-bulk' as any)}
+                        />
+                        <GridItem
+                            label="Stock Transfer"
+                            icon={<View style={styles.complexIcon}>
+                                <MaterialCommunityIcons name="swap-horizontal-bold" size={38} color={ACCENT_ORANGE} />
+                                <View style={[styles.orderBadge, { top: 14, right: -6 }]}>
+                                    <MaterialCommunityIcons name="arrow-right-bold-circle" size={18} color={PRIMARY_BLUE} />
+                                </View>
+                            </View>}
+                            onPress={() => router.push('/stock-transfer' as any)}
+                        />
+                        <GridItem
+                            label="Purchase Order"
+                            icon={<View style={styles.complexIcon}>
+                                <MaterialCommunityIcons name="file-document-edit-outline" size={38} color={PRIMARY_BLUE} />
+                                <View style={[styles.orderBadge, { top: 14, right: -6 }]}>
+                                    <MaterialCommunityIcons name="cart-arrow-down" size={18} color={SUCCESS_GREEN} />
+                                </View>
+                            </View>}
+                            onPress={() => router.push('/purchase-order' as any)}
+                        />
+                        <GridItem
+                            label="Sales Order"
+                            icon={<View style={styles.complexIcon}>
+                                <MaterialCommunityIcons name="cart-variant" size={38} color={PRIMARY_BLUE} />
+                                <View style={[styles.orderBadge, { top: 14, right: -6 }]}>
+                                    <MaterialCommunityIcons name="arrow-up-bold-circle" size={18} color={ACCENT_ORANGE} />
+                                </View>
+                            </View>}
+                            onPress={() => router.push('/sales-order' as any)}
+                        />
+                    </View>
+
+                    {/* Navigation Link - Premium Style */}
                     <TouchableOpacity
-                        style={styles.summaryContainer}
+                        style={styles.listLink}
                         onPress={() => router.push('/inventory-valuation' as any)}
                         activeOpacity={0.8}
                     >
-                        <View style={styles.summaryCard}>
-                            <Text style={styles.summaryLabel}>Total Items</Text>
-                            <Text style={styles.summaryValue}>{valuation.summary.totalItems}</Text>
-                        </View>
-                        <View style={styles.summaryCard}>
-                            <Text style={styles.summaryLabel}>Cost Value</Text>
-                            <Text style={[styles.summaryValue, { fontSize: 14 }]}>
-                                {formatCurrency(valuation.summary.totalCostValue)}
-                            </Text>
-                        </View>
-                        <View style={styles.summaryCard}>
-                            <Text style={styles.summaryLabel}>Retail Value</Text>
-                            <Text style={[styles.summaryValue, { fontSize: 14, color: '#10b981' }]}>
-                                {formatCurrency(valuation.summary.totalRetailValue)}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-                )}
-
-                {/* Quick Actions */}
-                <View style={styles.quickActionsRow}>
-                    <TouchableOpacity
-                        style={styles.quickActionBtn}
-                        onPress={() => router.push('/inventory-valuation' as any)}
-                    >
-                        <Ionicons name="wallet" size={20} color="#10b981" />
-                        <Text style={styles.quickActionText}>Valuation</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.quickActionBtn}
-                        onPress={() => router.push('/cogs-report' as any)}
-                    >
-                        <Ionicons name="bar-chart" size={20} color="#ef4444" />
-                        <Text style={styles.quickActionText}>COGS</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.quickActionBtn}
-                        onPress={() => router.push('/credit-memo' as any)}
-                    >
-                        <Ionicons name="return-down-back" size={20} color="#f59e0b" />
-                        <Text style={styles.quickActionText}>Returns</Text>
+                        <LinearGradient
+                            colors={['#fff', '#f8faff']}
+                            style={styles.listLinkGradient}
+                        >
+                            <View style={styles.listLinkLeft}>
+                                <View style={styles.listIconBox}>
+                                    <Ionicons name="list" size={20} color={PRIMARY_BLUE} />
+                                </View>
+                                <Text style={styles.listLinkText}>Inventory List & Reports</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color={PRIMARY_BLUE} />
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
 
-
-                {/* Search and Filter */}
-                <View style={styles.searchContainer}>
-                    <View style={styles.searchBox}>
-                        <Ionicons name="search" size={20} color="#6b7280" />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search by name or SKU..."
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                        />
+                {/* Branding Footer */}
+                <View style={styles.footer}>
+                    <Text style={styles.poweredBy}>Powered by Apbc Africa</Text>
+                    <View style={styles.logoRow}>
+                        <View style={styles.logoOrb}>
+                            <Image
+                                source={require('@/assets/images/icon.png')}
+                                style={styles.logoImg}
+                                resizeMode="contain"
+                            />
+                        </View>
                     </View>
-                    <TouchableOpacity
-                        style={[styles.filterButton, showLowStock && styles.filterButtonActive]}
-                        onPress={() => setShowLowStock(!showLowStock)}
-                    >
-                        <Ionicons
-                            name="warning"
-                            size={20}
-                            color={showLowStock ? '#fff' : '#ef4444'}
-                        />
-                        <Text style={[styles.filterText, showLowStock && styles.filterTextActive]}>
-                            Low Stock
-                        </Text>
-                    </TouchableOpacity>
                 </View>
 
-                {/* Inventory List */}
-                <View style={styles.listContainer}>
-                    {filteredInventory.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <Ionicons name="cube-outline" size={64} color="#d1d5db" />
-                            <Text style={styles.emptyText}>
-                                {searchQuery ? 'No items found' : 'No inventory items'}
-                            </Text>
-                            <Text style={styles.emptySubtext}>
-                                {searchQuery
-                                    ? 'Try a different search term'
-                                    : 'Tap the + button to add your first item'}
-                            </Text>
-                        </View>
-                    ) : (
-                        filteredInventory.map((item) => (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={styles.itemCard}
-                                onPress={() => router.push(`/inventory-detail?id=${item.id}` as any)}
-                                activeOpacity={0.7}
-                            >
-                                <View style={styles.itemHeader}>
-                                    <View style={styles.itemLeft}>
-                                        <View style={[
-                                            styles.iconCircle,
-                                            { backgroundColor: item.isLowStock ? '#fee2e2' : '#dbeafe' }
-                                        ]}>
-                                            <Ionicons
-                                                name="cube"
-                                                size={20}
-                                                color={item.isLowStock ? '#ef4444' : '#2563eb'}
-                                            />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.itemName}>{item.name}</Text>
-                                            <Text style={styles.itemSku}>SKU: {item.sku}</Text>
-                                            {item.category && (
-                                                <Text style={styles.itemCategory}>{item.category}</Text>
-                                            )}
-                                        </View>
-                                    </View>
-                                    {item.isLowStock && (
-                                        <View style={styles.lowStockBadge}>
-                                            <Ionicons name="warning" size={16} color="#ef4444" />
-                                            <Text style={styles.lowStockText}>Low</Text>
-                                        </View>
-                                    )}
-                                </View>
-
-                                <View style={styles.itemDetails}>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>Quantity:</Text>
-                                        <Text style={[
-                                            styles.detailValue,
-                                            { color: item.isLowStock ? '#ef4444' : '#1f2937' }
-                                        ]}>
-                                            {Number(item.quantity).toLocaleString()} {item.unit}
-                                        </Text>
-                                    </View>
-                                    {item.reorderLevel && (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>Reorder Level:</Text>
-                                            <Text style={styles.detailValue}>
-                                                {Number(item.reorderLevel).toLocaleString()} {item.unit}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>Cost Price:</Text>
-                                        <Text style={styles.detailValue}>
-                                            {formatCurrency(item.costPrice)}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>Selling Price:</Text>
-                                        <Text style={[styles.detailValue, { color: '#10b981' }]}>
-                                            {formatCurrency(item.sellingPrice)}
-                                        </Text>
-                                    </View>
-                                    <View style={[styles.detailRow, styles.stockValueRow]}>
-                                        <Text style={styles.stockValueLabel}>Stock Value:</Text>
-                                        <Text style={styles.stockValueAmount}>
-                                            {formatCurrency(item.stockValue)}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.itemFooter}>
-                                    <TouchableOpacity
-                                        style={styles.actionButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation();
-                                            router.push(`/stock-adjustment?itemId=${item.id}` as any);
-                                        }}
-                                    >
-                                        <Ionicons name="swap-horizontal" size={16} color="#2563eb" />
-                                        <Text style={styles.actionButtonText}>Adjust</Text>
-                                    </TouchableOpacity>
-                                    <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-                                </View>
-                            </TouchableOpacity>
-                        ))
-                    )}
-                </View>
-
-                <View style={{ height: 100 }} />
+                <View style={{ height: 40 }} />
             </ScrollView>
-        </SafeAreaView>
+        </View>
+    );
+}
+
+function GridItem({ label, icon, onPress }: { label: string; icon: React.ReactNode; onPress: () => void }) {
+    return (
+        <TouchableOpacity style={styles.gridItem} onPress={onPress} activeOpacity={0.85}>
+            <View style={styles.gridIconBox}>
+                {icon}
+            </View>
+            <Text style={styles.gridLabel} numberOfLines={2}>{label}</Text>
+        </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: '#f8fafc',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     header: {
+        paddingBottom: 15,
+    },
+    headerContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#f3f4f6',
-        alignItems: 'center',
-        justifyContent: 'center',
+        height: 55,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
-        color: '#1f2937',
+        color: ACCENT_ORANGE,
+        letterSpacing: 2,
     },
-    addButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#2563eb',
+    backButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.15)',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    loadingContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#6b7280',
     },
     scrollView: {
         flex: 1,
     },
-    summaryContainer: {
-        flexDirection: 'row',
-        padding: 16,
-        gap: 12,
+    scrollContent: {
+        paddingBottom: 40,
     },
-    summaryCard: {
+    visualContainer: {
+        padding: gridPadding,
+        height: 230,
+    },
+    premiumCardBg: {
         flex: 1,
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 24,
+        overflow: 'hidden',
+        position: 'relative',
+        ...Platform.select({
+            ios: {
+                shadowColor: PRIMARY_BLUE,
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.15,
+                shadowRadius: 15,
+            },
+            android: {
+                elevation: 8,
+            }
+        })
+    },
+    decorativeCircle: {
+        position: 'absolute',
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+    },
+    cardOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    statsPopUpCard: {
+        backgroundColor: LIGHT_CARD,
+        width: '85%',
+        paddingVertical: 24,
+        paddingHorizontal: 15,
+        borderRadius: 22,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.4)',
+        elevation: 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowRadius: 10,
     },
-    summaryLabel: {
-        fontSize: 12,
-        color: '#6b7280',
+    statPopLabel: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#334155',
         marginBottom: 8,
-    },
-    summaryValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#1f2937',
-    },
-    quickActionsRow: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        marginBottom: 16,
-        gap: 8,
-    },
-    quickActionBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        gap: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
-    },
-    quickActionText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#374151',
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        marginBottom: 16,
-        gap: 8,
-    },
-    searchBox: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        height: 48,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-    },
-    searchInput: {
-        flex: 1,
-        marginLeft: 8,
-        fontSize: 16,
-        color: '#1f2937',
-    },
-    filterButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        gap: 4,
-    },
-    filterButtonActive: {
-        backgroundColor: '#ef4444',
-        borderColor: '#ef4444',
-    },
-    filterText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#ef4444',
-    },
-    filterTextActive: {
-        color: '#fff',
-    },
-    listContainer: {
-        paddingHorizontal: 16,
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 60,
-    },
-    emptyText: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#6b7280',
-        marginTop: 16,
-    },
-    emptySubtext: {
-        fontSize: 14,
-        color: '#9ca3af',
-        marginTop: 8,
         textAlign: 'center',
     },
-    itemCard: {
+    statPopValue: {
+        fontSize: 26,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 15,
+    },
+    progressContainer: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    progressDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(18, 47, 138, 0.15)',
+    },
+    content: {
+        paddingHorizontal: gridPadding,
+    },
+    sectionHeader: {
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#334155',
+    },
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-start',
+        gap: gridGap,
+    },
+    gridItem: {
+        width: cardWidth,
+        height: cardWidth + 18,
         backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    itemHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 12,
-    },
-    itemLeft: {
-        flexDirection: 'row',
-        flex: 1,
-    },
-    iconCircle: {
-        width: 40,
-        height: 40,
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        ...Platform.select({
+            ios: {
+                shadowColor: PRIMARY_BLUE,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 3,
+            }
+        })
     },
-    itemName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1f2937',
-    },
-    itemSku: {
-        fontSize: 12,
-        color: '#6b7280',
-        marginTop: 2,
-    },
-    itemCategory: {
-        fontSize: 12,
-        color: '#2563eb',
-        marginTop: 2,
-    },
-    lowStockBadge: {
-        flexDirection: 'row',
+    gridIconBox: {
+        marginBottom: 10,
+        height: 55,
+        justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fee2e2',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
     },
-    lowStockText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#ef4444',
-    },
-    itemDetails: {
-        borderTopWidth: 1,
-        borderTopColor: '#f3f4f6',
-        paddingTop: 12,
-        marginBottom: 12,
-    },
-    detailRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    detailLabel: {
-        fontSize: 14,
-        color: '#6b7280',
-    },
-    detailValue: {
-        fontSize: 14,
-        color: '#1f2937',
-        fontWeight: '500',
-    },
-    stockValueRow: {
-        borderTopWidth: 1,
-        borderTopColor: '#f3f4f6',
-        paddingTop: 8,
-        marginTop: 4,
-    },
-    stockValueLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1f2937',
-    },
-    stockValueAmount: {
-        fontSize: 16,
+    gridLabel: {
+        fontSize: 11,
         fontWeight: 'bold',
-        color: '#2563eb',
+        color: '#334155',
+        textAlign: 'center',
+        lineHeight: 13,
     },
-    itemFooter: {
+    complexIcon: {
+        position: 'relative',
+        width: 55,
+        height: 55,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    subIcon: {
+        position: 'absolute',
+        top: 22,
+        right: -2,
+    },
+    subIconCenter: {
+        position: 'absolute',
+        top: 8,
+        right: -10,
+    },
+    orderBadge: {
+        position: 'absolute',
+        right: -4,
+        top: 14,
+        backgroundColor: '#fff',
+        borderRadius: 10,
+    },
+    crownIcon: {
+        position: 'absolute',
+        top: -2,
+        right: -4,
+    },
+    adjustBadge: {
+        position: 'absolute',
+        right: -6,
+        bottom: -2,
+        backgroundColor: ACCENT_ORANGE,
+        borderRadius: 12,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#fff',
+    },
+    listLink: {
+        marginTop: 25,
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    listLinkGradient: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: '#f3f4f6',
-        paddingTop: 12,
+        padding: 16,
     },
-    actionButton: {
+    listLinkLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-        backgroundColor: '#eff6ff',
-        gap: 4,
+        gap: 12,
     },
-    actionButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#2563eb',
+    listIconBox: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: '#f1f5f9',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    listLinkText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: PRIMARY_BLUE,
+    },
+    footer: {
+        marginTop: 40,
+        alignItems: 'center',
+    },
+    poweredBy: {
+        fontSize: 12,
+        color: '#94a3b8',
+        marginBottom: 10,
+    },
+    logoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    logoOrb: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: PRIMARY_BLUE,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 4,
+    },
+    logoImg: {
+        width: 22,
+        height: 22,
     },
 });

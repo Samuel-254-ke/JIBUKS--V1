@@ -238,6 +238,7 @@ router.post('/', async (req, res) => {
             accountId, // Legacy support
             splits,     // NEW: Array of { category, amount, description }
             payee,      // NEW: Payee name
+            taxTreatment, // NEW: 'Inclusive of Tax', 'Exclusive of Tax', or 'Out of Scope'
         } = req.body;
 
         // Validation
@@ -262,7 +263,7 @@ router.post('/', async (req, res) => {
             });
         }
 
-        const parsedAmount = parseFloat(amount);
+        let parsedAmount = parseFloat(amount);
         if (isNaN(parsedAmount) || parsedAmount <= 0) {
             return res.status(400).json({ error: 'Amount must be a positive number' });
         }
@@ -271,6 +272,7 @@ router.post('/', async (req, res) => {
         let resolvedDebitAccountId = null;
         let resolvedCreditAccountId = null;
         let journalDescription = `${type}: ${payee || category}${description ? ' - ' + description : ''}`;
+        let totalVatCalculated = 0;
 
         // ==========================================
         // SPECIAL HANDLING: LIABILITY TRANSACTIONS
@@ -560,8 +562,33 @@ router.post('/', async (req, res) => {
             });
 
             // 2. Debit Lines (Splits)
+            let totalVat = 0;
+            const inputVatAccount = await prisma.account.findFirst({
+                where: { tenantId, code: '1157' } // Input VAT - Default for Kenya/Standard COA
+            });
+
             for (const split of splits) {
                 let splitDebitId;
+                const splitAmount = parseFloat(split.amount);
+
+                // VAT Calculation Logic
+                let baseAmount = splitAmount;
+                let splitVat = 0;
+
+                if (split.vatRate && split.vatRate > 0) {
+                    const rate = parseFloat(split.vatRate) / 100;
+                    if (taxTreatment === 'Inclusive of Tax') {
+                        // Amount includes tax: Amount = Base * (1 + rate) => Base = Amount / (1 + rate)
+                        baseAmount = splitAmount / (1 + rate);
+                        splitVat = splitAmount - baseAmount;
+                    } else if (taxTreatment === 'Exclusive of Tax') {
+                        // Amount is base: Tax = Base * rate
+                        splitVat = splitAmount * rate;
+                        baseAmount = splitAmount;
+                    }
+                }
+
+                totalVat += splitVat;
 
                 // Priority: Explicit Account ID > Category Mapping
                 if (split.accountId) {
@@ -581,22 +608,42 @@ router.post('/', async (req, res) => {
 
                 lines.push({
                     accountId: splitDebitId,
-                    debit: parseFloat(split.amount),
+                    debit: baseAmount,
                     credit: 0,
                     description: split.description || split.category,
                 });
             }
 
+            // 3. Add VAT Journal Line if exists
+            if (totalVat > 0 && inputVatAccount) {
+                lines.push({
+                    accountId: inputVatAccount.id,
+                    debit: totalVat,
+                    credit: 0,
+                    description: `Input VAT on Expense: ${payee || 'Multiple'}`,
+                });
+            }
+
+            const finalJournalAmount = parsedAmount;
+
             // Create Complex Journal
             const journal = await createJournalEntry({
                 tenantId,
                 lines,
-                amount: parsedAmount,
+                amount: finalJournalAmount,
                 description: journalDescription,
                 date: date ? new Date(date) : new Date(),
                 createdById: userId,
             });
             journalRef = journal;
+            totalVatCalculated = totalVat;
+
+            // Also update the transaction record amount if it was exclusive
+            if (taxTreatment === 'Exclusive of Tax') {
+                // Ensure the transaction record reflects the total paid (Inclusive value)
+                // This ensures consistency across the UI
+                parsedAmount = finalJournalAmount;
+            }
         }
 
         // ==========================================
@@ -815,6 +862,50 @@ router.post('/', async (req, res) => {
             },
         });
 
+        // ==========================================
+        // SYNC WITH EXPENSE MODULE
+        // ==========================================
+        // If this is an EXPENSE and we have a vendor/payee, track it in the Expense model
+        // for vendor history/autofill logic.
+        if (type === 'EXPENSE') {
+            const { vendorId, payee: payeeName } = req.body;
+            let resolvedVendorId = vendorId;
+
+            // If no vendorId provided, try to find vendor by name
+            if (!resolvedVendorId && payeeName) {
+                const vendor = await prisma.vendor.findFirst({
+                    where: { tenantId, name: { equals: payeeName, mode: 'insensitive' } }
+                });
+                if (vendor) resolvedVendorId = vendor.id;
+            }
+
+            if (resolvedVendorId) {
+                try {
+                    // Create an entry in the Expense model to drive vendor history
+                    await prisma.expense.create({
+                        data: {
+                            tenantId,
+                            expenseNumber: `EXP-${transaction.id}`,
+                            date: transaction.date,
+                            amount: Number(transaction.amount) - totalVatCalculated,
+                            totalAmount: Number(transaction.amount),
+                            vatAmount: totalVatCalculated,
+                            category: transaction.category,
+                            vendorId: resolvedVendorId,
+                            paymentMethod: transaction.paymentMethod || 'Other',
+                            description: transaction.description,
+                            reference: transaction.notes,
+                            accountId: transaction.debitAccountId || resolvedDebitAccountId // The expense account
+                        }
+                    });
+                    console.log(`[Transactions] Synced with Expense module for Vendor ${resolvedVendorId}`);
+                } catch (expErr) {
+                    console.error('[Transactions] Failed to sync with Expense module:', expErr);
+                    // Don't fail the whole transaction if this secondary sync fails
+                }
+            }
+        }
+
         console.log(`[Transactions] Created transaction ${transaction.id} with journal ${journalRef.id}`);
 
         res.status(201).json({
@@ -825,8 +916,9 @@ router.post('/', async (req, res) => {
             creditAccountId: `acct-${resolvedCreditAccountId}`,
         });
     } catch (error) {
-        console.error('Error creating transaction:', error);
-        res.status(500).json({ error: 'Failed to create transaction' });
+        console.error('Error creating transaction:', error.message || error);
+        console.error('Stack:', error.stack);
+        res.status(500).json({ error: 'Failed to create transaction', details: error.message });
     }
 });
 
