@@ -14,7 +14,8 @@ import {
   Switch,
   Modal,
   FlatList,
-  Image
+  Image,
+  StatusBar
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +46,14 @@ interface DeductionRow {
   name: string;
   amount: string;
 }
+
+// Income source tiles
+const INCOME_SOURCES = [
+  { key: 'salary',   label: 'SALARY',   icon: 'briefcase' },
+  { key: 'business', label: 'BUSINESS', icon: 'trending-up' },
+  { key: 'gift',     label: 'GIFT',     icon: 'gift' },
+  { key: 'other',    label: 'OTHER',    icon: 'add-circle-outline' },
+] as const;
 
 // Reusable Dropdown Modal
 const SelectorModal = ({
@@ -97,7 +106,8 @@ export default function AddIncomeScreen() {
   const { accounts: contextAccounts, refreshAccounts } = useAccounts();
 
   // State
-  const [mode, setMode] = useState<Mode>('QUICK');
+  const [mode, setMode] = useState<Mode>('SALARY');
+  const [activeSource, setActiveSource] = useState<string>('salary');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -160,6 +170,10 @@ export default function AddIncomeScreen() {
 
       const defaultMethod = fetchedMethods.find((m: any) => m.name === 'Cash') || fetchedMethods[0];
       if (defaultMethod) setSelectedPaymentMethod(defaultMethod);
+
+      const defaultSalary = fetchedAccounts.find((a: any) => a.type === 'INCOME' && a.name.toLowerCase().includes('salary'))
+        || fetchedAccounts.find((a: any) => a.type === 'INCOME');
+      if (defaultSalary) setSalaryIncomeAccount(defaultSalary);
 
     } catch (error) {
       console.error('Failed to load data', error);
@@ -347,6 +361,18 @@ export default function AddIncomeScreen() {
 
   const formatDate = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
+  const handleSourceSelect = (key: string) => {
+    setActiveSource(key);
+    if (key === 'salary') {
+      setMode('SALARY');
+      setGrossAmount(amount);
+    } else {
+      setMode('QUICK');
+      const cat = categories.find((c: any) => c.name.toLowerCase().includes(key)) || categories[0];
+      if (cat) setSelectedCategory(cat);
+    }
+  };
+
   // Renderers for Modals
   const renderAccountItem = (account: Account) => (
     <View style={styles.dropdownItem}>
@@ -370,464 +396,203 @@ export default function AddIncomeScreen() {
     </View>
   );
 
+  const dateLabel = (() => {
+    const t = new Date();
+    if (date.toDateString() === t.toDateString()) return 'Today';
+    const y = new Date(t); y.setDate(t.getDate() - 1);
+    if (date.toDateString() === y.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  })();
+
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
 
-        {/* Header with Blue Gradient */}
-        <LinearGradient colors={[COLORS.primary, '#1e40af']} style={styles.header}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+      {/* ── HEADER ── */}
+      <LinearGradient colors={['#1a3a8f', '#0e2470']} style={styles.header}>
+        <SafeAreaView>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={22} color="#FFAA00" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Record Income</Text>
-            <View style={{ width: 40 }} />
+            <Text style={styles.headerTitle}>Add income</Text>
+            <View style={{ width: 38 }} />
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+          {/* ── AMOUNT CARD ── */}
+          <View style={styles.amountCard}>
+            <Text style={styles.amountLabel}>AMOUNT</Text>
+            <View style={styles.amountRow}>
+              <Text style={styles.amountKes}>KES</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={amount}
+                onChangeText={(v) => { setAmount(v); if (activeSource === 'salary') setGrossAmount(v); }}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor="#CBD5E1"
+              />
+            </View>
+            <TouchableOpacity style={styles.datePill}>
+              <Ionicons name="calendar" size={14} color="#6B7280" />
+              <Text style={styles.datePillText}>{dateLabel}</Text>
+              <Ionicons name="chevron-down" size={14} color="#6B7280" />
+            </TouchableOpacity>
           </View>
 
-          {/* Toggle Switch */}
-          <View style={styles.toggleContainer}>
+          {/* ── SOURCE ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Source</Text>
+            <View style={styles.sourceGrid}>
+              {INCOME_SOURCES.map((src) => {
+                const active = activeSource === src.key;
+                return (
+                  <TouchableOpacity
+                    key={src.key}
+                    style={[styles.sourceCard, active && styles.sourceCardActive]}
+                    onPress={() => handleSourceSelect(src.key)}
+                  >
+                    <View style={[styles.sourceIconWrap, active && styles.sourceIconWrapActive]}>
+                      <Ionicons name={src.icon as any} size={28} color={active ? '#fff' : '#9CA3AF'} />
+                    </View>
+                    <Text style={[styles.sourceLabel, active && styles.sourceLabelActive]}>{src.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* ── DETAILS ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Details</Text>
+            <View style={styles.detailsRow}>
+              <Ionicons name="document-text-outline" size={18} color="#9CA3AF" />
+              <TextInput
+                style={styles.detailsInput}
+                placeholder="What was this from?"
+                placeholderTextColor="#9CA3AF"
+                value={description}
+                onChangeText={setDescription}
+              />
+            </View>
+          </View>
+
+          {/* ── SUBMIT ── */}
+          <View style={styles.section}>
             <TouchableOpacity
-              style={[styles.toggleBtn, mode === 'QUICK' && styles.toggleBtnActive]}
-              onPress={() => setMode('QUICK')}
+              style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
+              onPress={handleSubmit}
+              disabled={submitting}
             >
-              <Text style={[styles.toggleText, mode === 'QUICK' && styles.toggleTextActive]}>Quick Deposit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, mode === 'SALARY' && styles.toggleBtnActive]}
-              onPress={() => setMode('SALARY')}
-            >
-              <Text style={[styles.toggleText, mode === 'SALARY' && styles.toggleTextActive]}>Payslip / Salary</Text>
+              {submitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  <Text style={styles.submitTxt}>Save Income</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        </LinearGradient>
 
-        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
+          {/* ── FOOTER ── */}
+          <View style={styles.footer}>
+            <Text style={styles.footerTxt}>Powered by </Text>
+            <Text style={styles.footerBrand}>Apbc 🌍</Text>
+          </View>
 
-          {/* ================= MODE 1: QUICK DEPOSIT ================= */}
-          {mode === 'QUICK' && (
-            <View style={styles.formContainer}>
-
-              {/* Amount Card */}
-              <View style={styles.card}>
-                <Text style={styles.label}>Amount Received</Text>
-                <View style={styles.amountInputWrap}>
-                  <Text style={styles.currency}>KES</Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    value={amount}
-                    onChangeText={setAmount}
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-              </View>
-
-              {/* Inputs Card */}
-              <View style={styles.card}>
-
-                {/* Received From Dropdown */}
-                <Text style={styles.label}>Received From (Customer/Source)</Text>
-                <TouchableOpacity style={styles.selector} onPress={() => setShowCustomerModal(true)}>
-                  <Text style={[styles.selectorText, !selectedCustomer && styles.placeholderText]}>
-                    {selectedCustomer ? selectedCustomer.name : 'Select Payer...'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={COLORS.textLight} />
-                </TouchableOpacity>
-
-                {/* Deposit To Dropdown */}
-                <Text style={[styles.label, { marginTop: 15 }]}>Deposit To Account</Text>
-                <TouchableOpacity style={styles.selector} onPress={() => setShowDepositModal(true)}>
-                  {selectedDepositAccount ? (
-                    <View>
-                      <Text style={styles.selectorText}>{selectedDepositAccount.name}</Text>
-                      <Text style={styles.balanceText}>Current Balance: KES {selectedDepositAccount.balance?.toLocaleString() || '0'}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.placeholderText}>Select Bank/M-Pesa...</Text>
-                  )}
-                  <Ionicons name="chevron-down" size={20} color={COLORS.textLight} />
-                </TouchableOpacity>
-
-                {/* Category Dropdown */}
-                <Text style={[styles.label, { marginTop: 15 }]}>Income Category</Text>
-                <TouchableOpacity style={styles.selector} onPress={() => setShowCategoryModal(true)}>
-                  <Text style={[styles.selectorText, !selectedCategory && styles.placeholderText]}>
-                    {selectedCategory ? selectedCategory.name : 'Select Category...'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={COLORS.textLight} />
-                </TouchableOpacity>
-
-                {/* Payment Method Dropdown */}
-                <Text style={[styles.label, { marginTop: 15 }]}>Payment Method</Text>
-                <TouchableOpacity style={styles.selector} onPress={() => setShowPaymentMethodModal(true)}>
-                  <Text style={[styles.selectorText, !selectedPaymentMethod && styles.placeholderText]}>
-                    {selectedPaymentMethod ? selectedPaymentMethod.name : 'Select Method...'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={COLORS.textLight} />
-                </TouchableOpacity>
-
-                {/* Date */}
-                <Text style={[styles.label, { marginTop: 15 }]}>Date</Text>
-                <View style={styles.dateSelector}>
-                  <Ionicons name="calendar-outline" size={20} color={COLORS.textLight} />
-                  <Text style={styles.selectorText}>{formatDate(date)}</Text>
-                </View>
-
-                {/* Description */}
-                <Text style={[styles.label, { marginTop: 15 }]}>Description</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. January Rent"
-                  value={description}
-                  onChangeText={setDescription}
-                />
-
-                {/* Attachment */}
-                <Text style={[styles.label, { marginTop: 15 }]}>Attachment</Text>
-                <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
-                  {attachment ? (
-                    <View style={styles.attachmentPreview}>
-                      <Ionicons name="image" size={20} color={COLORS.primary} />
-                      <Text style={styles.attachmentText}>Receipt Attached</Text>
-                      <TouchableOpacity onPress={() => setAttachment(null)} style={{ marginLeft: 10 }}>
-                        <Ionicons name="close-circle" size={20} color={COLORS.danger} />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <>
-                      <Ionicons name="camera-outline" size={24} color={COLORS.textLight} />
-                      <Text style={styles.uploadText}>Upload Receipt</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-
-              </View>
-            </View>
-          )}
-
-          {/* ================= MODE 2: SALARY / PAYSLIP ================= */}
-          {mode === 'SALARY' && (
-            <View style={styles.formContainer}>
-
-              {/* Section A: Gross */}
-              <View style={styles.card}>
-                <View style={[styles.cardHeader, { justifyContent: 'space-between' }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <View style={[styles.iconBox, { backgroundColor: '#EFF6FF' }]}>
-                      <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
-                    </View>
-                    <Text style={styles.sectionTitle}>1. Gross Earnings</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.autoFillBtn}
-                    onPress={async () => {
-                      setLoading(true);
-                      try {
-                        const txs = await apiService.getTransactions({ type: 'INCOME', limit: 10 });
-                        const lastSalary = txs.find(t => t.category === 'Salary' || (t.description && t.description.toLowerCase().includes('salary')));
-
-                        if (lastSalary) {
-                          setGrossAmount(lastSalary.amount.toString());
-                          setEmployer(lastSalary.payee || lastSalary.description?.replace('Salary: ', '') || '');
-                          Alert.alert('Auto-Filled', `Loaded details from ${new Date(lastSalary.date).toLocaleDateString()}`);
-
-                          // If we had split details in the transaction object from the API, we could parse them here.
-                          // But since getTransactions currently might not return full split details in the simplified list, 
-                          // we stick to the main headers for now unless we fetch details.
-                          // Optimistic UI for now.
-                        } else {
-                          Alert.alert('No History', 'Could not find a previous salary slip.');
-                        }
-                      } catch (e) {
-                        console.error(e);
-                        Alert.alert('Error', 'Failed to fetch history');
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    <Ionicons name="flash" size={14} color="#fff" />
-                    <Text style={styles.autoFillText}>Clone Last Month</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.label}>Income Type (Source Account)</Text>
-                <TouchableOpacity style={styles.selector} onPress={() => setShowIncomeAccountModal(true)}>
-                  <Text style={[styles.selectorText, !salaryIncomeAccount && styles.placeholderText]}>
-                    {salaryIncomeAccount ? salaryIncomeAccount.name : 'Select Income Type...'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={COLORS.textLight} />
-                </TouchableOpacity>
-
-                <Text style={[styles.label, { marginTop: 15 }]}>Employer / Payer</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Acme Corp Ltd"
-                  value={employer}
-                  onChangeText={setEmployer}
-                />
-
-                <View style={{ marginTop: 15 }}>
-                  <Text style={styles.label}>GROSS AMOUNT (Pre-Tax)</Text>
-                  <View style={[styles.amountInputWrap, { borderBottomColor: COLORS.primaryLight }]}>
-                    <Text style={[styles.currency, { color: COLORS.primary }]}>KES</Text>
-                    <TextInput
-                      style={styles.amountInput}
-                      value={grossAmount}
-                      onChangeText={setGrossAmount}
-                      placeholder="0.00"
-                      keyboardType="numeric"
-                      placeholderTextColor="#9CA3AF"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* Section B: Deductions Grid */}
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={[styles.iconBox, { backgroundColor: '#FEF2F2' }]}>
-                    <Ionicons name="cut-outline" size={20} color={COLORS.danger} />
-                  </View>
-                  <Text style={[styles.sectionTitle, { color: COLORS.danger }]}>2. Taxes & Deductions</Text>
-                </View>
-
-                <View style={styles.gridHeader}>
-                  <Text style={[styles.gridHeadText, { flex: 2 }]}>Type</Text>
-                  <Text style={[styles.gridHeadText, { flex: 1, textAlign: 'right' }]}>Amount</Text>
-                  <View style={{ width: 30 }} />
-                </View>
-
-                {deductions.map((row) => (
-                  <View key={row.id} style={styles.gridRow}>
-                    {/* Deduction Selector */}
-                    <TouchableOpacity
-                      style={styles.deductionSelector}
-                      onPress={() => setShowDeductionAccountModal({ visible: true, rowId: row.id })}
-                    >
-                      <Text style={styles.deductionSelectorText}>
-                        {row.name || 'Select Tax/Fee...'}
-                      </Text>
-                      <Ionicons name="chevron-down" size={16} color={COLORS.textLight} />
-                    </TouchableOpacity>
-
-                    {/* Amount Input */}
-                    <TextInput
-                      style={styles.gridInput}
-                      value={row.amount}
-                      onChangeText={(val) => {
-                        setDeductions(prev => prev.map(r => r.id === row.id ? { ...r, amount: val } : r));
-                      }}
-                      placeholder="0"
-                      keyboardType="numeric"
-                    />
-
-                    {/* Delete */}
-                    <TouchableOpacity
-                      onPress={() => setDeductions(prev => prev.filter(r => r.id !== row.id))}
-                      style={styles.trashBtn}
-                    >
-                      <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-
-                <TouchableOpacity
-                  style={[styles.addBtn, { borderColor: COLORS.danger }]}
-                  onPress={() => setDeductions([...deductions, { id: Date.now().toString(), accountId: '', name: '', amount: '' }])}
-                >
-                  <Ionicons name="add-circle" size={20} color={COLORS.danger} />
-                  <Text style={[styles.addBtnText, { color: COLORS.danger }]}>+ Add Deduction Line</Text>
-                </TouchableOpacity>
-
-                <View style={styles.divider} />
-
-                <View style={styles.rowBetween}>
-                  <Text style={styles.totalLabel}>Total Deductions:</Text>
-                  <Text style={styles.totalValue}>{totalDeductions.toLocaleString()}</Text>
-                </View>
-              </View>
-
-              {/* Section C: Net Pay */}
-              <View style={[styles.card, { backgroundColor: COLORS.primary }]}>
-                <View style={[styles.cardHeader, { marginBottom: 10 }]}>
-                  <View style={[styles.iconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                    <Ionicons name="wallet" size={20} color="#fff" />
-                  </View>
-                  <Text style={[styles.sectionTitle, { color: '#fff' }]}>3. Net Deposit</Text>
-                </View>
-
-                <View style={{ alignItems: 'center', marginVertical: 10 }}>
-                  <Text style={[styles.netLabel, { color: 'rgba(255,255,255,0.7)' }]}>TOTAL TO BANK</Text>
-                  <Text style={styles.netAmount}>KES {netSalary.toLocaleString()}</Text>
-                </View>
-
-                <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 12, marginTop: 10 }}>
-                  <Text style={[styles.label, { color: 'rgba(255,255,255,0.8)', marginBottom: 8 }]}>Deposit To Account</Text>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-                    onPress={() => setShowDepositModal(true)}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Ionicons name="card-outline" size={24} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
-                        {selectedDepositAccount ? selectedDepositAccount.name : 'Select Account'}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
-                  </TouchableOpacity>
-                  {selectedDepositAccount && (
-                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 5, marginLeft: 34 }}>
-                      Current Bal: KES {selectedDepositAccount.balance?.toLocaleString() || '0'}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-            </View>
-          )}
-
+          <View style={{ height: 60 }} />
         </ScrollView>
-
-        {/* Footer Submit */}
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
-            {submitting ? <ActivityIndicator color="#fff" /> : (
-              <Text style={styles.submitBtnText}>
-                {mode === 'QUICK' ? 'Record Income' : 'Process Payslip'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
       </KeyboardAvoidingView>
 
-      {/* ================= MODALS ================= */}
-
-      {/* 1. Customers Modal */}
-      <SelectorModal
-        visible={showCustomerModal}
-        onClose={() => setShowCustomerModal(false)}
-        title="Received From"
-        items={customers}
-        onSelect={setSelectedCustomer}
-        renderItem={renderCustomerItem}
-      />
-
-      {/* 2. Deposit Account Modal */}
-      <SelectorModal
-        visible={showDepositModal}
-        onClose={() => setShowDepositModal(false)}
-        title="Deposit To Account"
-        items={assetAccounts}
-        onSelect={setSelectedDepositAccount}
-        renderItem={renderAccountItem}
-      />
-
-      {/* 3. Categories Modal */}
+      {/* MODALS */}
       <SelectorModal
         visible={showCategoryModal}
         onClose={() => setShowCategoryModal(false)}
-        title="Income Category"
+        title="Select Category"
         items={categories}
-        onSelect={setSelectedCategory}
+        onSelect={(cat) => setSelectedCategory(cat)}
       />
-
-      {/* 4. Payment Methods Modal */}
       <SelectorModal
-        visible={showPaymentMethodModal}
-        onClose={() => setShowPaymentMethodModal(false)}
-        title="Payment Method"
-        items={paymentMethods}
-        onSelect={setSelectedPaymentMethod}
+        visible={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+        title="Deposit Account"
+        items={assetAccounts}
+        onSelect={(acc) => setSelectedDepositAccount(acc)}
+        renderItem={renderAccountItem}
       />
-
-      {/* 5. Deductions Modal (Grouped) */}
-      <Modal visible={showDeductionAccountModal.visible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Deduction Type</Text>
-              <TouchableOpacity onPress={() => setShowDeductionAccountModal({ visible: false, rowId: null })} style={styles.closeBtn}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
-              {/* EXPENSES GROUP */}
-              <Text style={styles.groupHeader}>DEDUCTIONS (EXPENSES)</Text>
-              {deductionHeadings.filter(i => i.category === 'Statutory').map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    if (showDeductionAccountModal.rowId) {
-                      setDeductions(prev => prev.map(row =>
-                        row.id === showDeductionAccountModal.rowId
-                          ? { ...row, accountId: item.id.toString(), name: item.name.replace(/(Tax:|Insurance:)\s*/, '') }
-                          : row
-                      ));
-                    }
-                    setShowDeductionAccountModal({ visible: false, rowId: null });
-                  }}
-                >
-                  <View style={[styles.dropdownIcon, { backgroundColor: '#FEE2E2' }]}>
-                    <Ionicons name="arrow-up-circle" size={18} color="#EF4444" />
-                  </View>
-                  <Text style={styles.modalItemText}>{item.name}</Text>
-                </TouchableOpacity>
-              ))}
-
-              <View style={{ height: 20 }} />
-
-              {/* TRANSFERS GROUP */}
-              <Text style={[styles.groupHeader, { color: '#2563EB' }]}>TRANSFERS (ASSETS/LOANS)</Text>
-              {deductionHeadings.filter(i => i.category === 'Transfer').map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    if (showDeductionAccountModal.rowId) {
-                      setDeductions(prev => prev.map(row =>
-                        row.id === showDeductionAccountModal.rowId
-                          ? { ...row, accountId: item.id.toString(), name: item.name }
-                          : row
-                      ));
-                    }
-                    setShowDeductionAccountModal({ visible: false, rowId: null });
-                  }}
-                >
-                  <View style={[styles.dropdownIcon, { backgroundColor: '#DBEAFE' }]}>
-                    <Ionicons name="swap-horizontal" size={18} color="#2563EB" />
-                  </View>
-                  <Text style={styles.modalItemText}>{item.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 6. Income Account Modal (Payslip Mode) */}
       <SelectorModal
         visible={showIncomeAccountModal}
         onClose={() => setShowIncomeAccountModal(false)}
-        title="Select Income Type"
+        title="Income Account"
         items={incomeAccounts}
-        onSelect={setSalaryIncomeAccount}
+        onSelect={(acc) => setSalaryIncomeAccount(acc)}
         renderItem={renderAccountItem}
       />
 
-    </SafeAreaView >
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
+  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  header: { paddingBottom: 16, paddingHorizontal: 20 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFAA00' },
+  scroll: { paddingBottom: 20 },
+  amountCard: { marginHorizontal: 16, marginTop: 12, marginBottom: 8, backgroundColor: '#fff', borderRadius: 20, padding: 20, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+  amountLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.5, marginBottom: 8 },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  amountKes: { fontSize: 22, fontWeight: '600', color: '#9CA3AF' },
+  amountInput: { fontSize: 42, fontWeight: '800', color: '#1F2937', minWidth: 120 },
+  datePill: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12, backgroundColor: '#F5F7FA', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: '#E5E7EB' },
+  datePillText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  section: { paddingHorizontal: 16, marginBottom: 16 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 12 },
+  sourceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  sourceCard: { width: '46%', backgroundColor: '#fff', borderRadius: 16, padding: 20, alignItems: 'center', gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, borderWidth: 1.5, borderColor: 'transparent' as any },
+  sourceCardActive: { borderColor: '#1a3a8f', backgroundColor: '#EEF2FF' },
+  sourceIconWrap: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },
+  sourceIconWrapActive: { backgroundColor: '#1a3a8f' },
+  sourceLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 0.8 },
+  sourceLabelActive: { color: '#1a3a8f' },
+  detailsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  detailsInput: { flex: 1, fontSize: 14, color: '#1F2937', paddingVertical: 14 },
+  submitBtn: { backgroundColor: '#F97316', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: '#F97316', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+  submitTxt: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 8 },
+  footerTxt: { fontSize: 12, color: '#9CA3AF' },
+  footerBrand: { fontSize: 12, fontWeight: '700', color: '#1a3a8f' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%' as any, paddingBottom: 30 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  closeBtn: {},
+  modalItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
+  modalItemText: { fontSize: 15, color: '#1F2937', flex: 1 },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  dropdownIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  dropdownTitle: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
+  dropdownSubtitle: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  // legacy aliases kept for any remaining references
+  toggleContainer: {} as any,
+  toggleBtn: {} as any,
+  toggleBtnActive: {} as any,
+  toggleText: {} as any,
+  toggleTextActive: {} as any,
+  content: {} as any,
+  formContainer: {} as any,
+  card: {} as any,
+  headerTop: {} as any,
+}) as any;
+const _: any = ({
   header: {
     paddingTop: 50,
     paddingBottom: 25,
