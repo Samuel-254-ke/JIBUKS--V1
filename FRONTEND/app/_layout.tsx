@@ -119,6 +119,9 @@ export default function RootLayout() {
             <Stack.Screen name="income-sources" options={{ headerShown: false }} />
             <Stack.Screen name="spending-categories" options={{ headerShown: false }} />
             <Stack.Screen name="monthly-budgets" options={{ headerShown: false }} />
+            <Stack.Screen name="budget-categories" options={{ headerShown: false }} />
+            <Stack.Screen name="edit-budget" options={{ headerShown: false }} />
+            <Stack.Screen name="add-budget-category" options={{ headerShown: false }} />
             <Stack.Screen name="financial-goals" options={{ headerShown: false }} />
             <Stack.Screen name="add-saving-goals" options={{ headerShown: false }} />
             <Stack.Screen name="goal-detail" options={{ headerShown: false }} />
