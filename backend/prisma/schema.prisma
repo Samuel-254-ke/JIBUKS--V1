@@ -26,11 +26,11 @@ model Tenant {
   budgets               Budget[]
   goals                 Goal[]
   users                 User[]
-  transactions          Transaction[]
+  itemTypes             ItemType[]
+  accounts              Account[]
   categories            Category[]
   paymentMethods        PaymentMethod[]
   recurringTransactions RecurringTransaction[]
-  accounts              Account[]
   journals              Journal[]
   vendors               Vendor[]
   purchases             Purchase[]
@@ -49,6 +49,7 @@ model Tenant {
   transfers             Transfer[]
   loans                 Loan[]
   vatRates              VatRate[]
+  transactions          Transaction[]
 
   @@map("tenants")
 }
@@ -90,11 +91,12 @@ model Account {
   metadata        Json?         // Flexible field for Loan Terms (rate, installment, dates) or Bank Details
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
+  detailType      String?       @map("detail_type") // For granular filtering like "Sales of Product Income"
 
   // Relations
   tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent          Account?      @relation("AccountHierarchy", fields: [parentId], references: [id])
-  children        Account[]     @relation("AccountHierarchy")
+  parent          Account?      @relation("AccountToAccount", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children        Account[]     @relation("AccountToAccount")
   journalLines    JournalLine[]
   invoiceItems    InvoiceItem[]
   invoicePayments InvoicePayment[]
@@ -232,8 +234,14 @@ model User {
   resetPasswordOtp      String?                @map("reset_password_otp")
   resetPasswordExpires  DateTime?              @map("reset_password_expires")
 
+  lastSeenAt            DateTime?              @map("last_seen_at")
+
+  adminMessagingConversation AdminMessagingConversation?
+
   @@index([tenantId])
   @@index([auth0Id])
+  @@index([lastSeenAt])
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -274,6 +282,7 @@ enum Role {
   PARENT
   CHILD
   MEMBER
+  SUPER_ADMIN
 }
 
 model Transaction {
@@ -316,6 +325,12 @@ model Category {
   type      String   // 'income' or 'expense'
   icon      String?
   color     String?
+  
+  isSubCategory Boolean   @default(false) @map("is_sub_category")
+  parentId      Int?      @map("parent_id")
+  parent        Category? @relation("SubCategories", fields: [parentId], references: [id])
+  children      Category[] @relation("SubCategories")
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -538,9 +553,25 @@ model PurchasePayment {
 
 // Product Type Enum
 enum ProductType {
-  GOODS       // Physical items - Track stock
-  SERVICE     // Services - No stock tracking
-  BUNDLE      // Kit/Bundle of multiple items
+  SERVICE
+  INVENTORY_ITEM
+  NON_INVENTORY_ITEM
+  BUNDLE
+  GOODS
+}
+
+model ItemType {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  name      String   // Service, Inventory item, Non-inventory item, Bundle
+  code      String   // SERVICE, INVENTORY_ITEM, NON_INVENTORY_ITEM, BUNDLE
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, code])
+  @@map("item_types")
 }
 
 // Inventory/Stock Management - Enhanced
@@ -556,7 +587,7 @@ model InventoryItem {
   imageUrl            String?         @map("image_url") // Product photo
   
   // ========== CLASSIFICATION ==========
-  productType         ProductType     @default(GOODS) @map("product_type")
+  productType         ProductType     @default(INVENTORY_ITEM) @map("product_type")
   category            String?         // "Electronics", "Food", "Apparel"
   brand               String?         // "Samsung", "Nike"
   unit                String          @default("pcs") // "pcs", "kg", "liters", "box"
@@ -1197,4 +1228,123 @@ model LoanTransaction {
 
   @@index([loanId])
   @@map("loan_transactions")
+}
+
+// ============================================
+// SYSTEM ADMINISTRATORS
+// ============================================
+
+model Admin {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  password        String
+  name            String
+  phone           String?
+  organization    String?
+  isSuperAdmin    Boolean  @default(false) @map("is_super_admin")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  messagingMessages AdminMessagingMessage[]
+
+  @@map("admins")
+}
+
+// ============================================
+// ADMIN ↔ TENANT USER MESSAGING (super admin inbox)
+// ============================================
+
+enum MessagingSenderRole {
+  ADMIN
+  CLIENT
+}
+
+model AdminMessagingConversation {
+  id              String   @id @default(cuid())
+  clientUserId    Int      @unique @map("client_user_id")
+  adminLastReadAt DateTime? @map("admin_last_read_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  clientUser User                     @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+  messages   AdminMessagingMessage[]
+
+  @@index([updatedAt])
+  @@map("admin_messaging_conversations")
+}
+
+model AdminMessagingMessage {
+  id             Int                 @id @default(autoincrement())
+  conversationId String              @map("conversation_id")
+  senderRole     MessagingSenderRole @map("sender_role")
+  adminId        Int?                @map("admin_id")
+  body           String
+  attachments    Json?
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  conversation AdminMessagingConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  admin        Admin?                     @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("admin_messaging_messages")
+}
+
+// ============================================
+// SUPER ADMIN DASHBOARD — aggregated analytics (seeded / future ingestion)
+// ============================================
+
+model PlatformTrafficDay {
+  id                  Int      @id @default(autoincrement())
+  day                 DateTime @db.Date
+  clicks              Int      @default(0)
+  uniques             Int      @default(0)
+  bounceRate          Decimal  @default(0) @map("bounce_rate") @db.Decimal(5, 2)
+  avgSessionSeconds   Int      @default(0) @map("avg_session_seconds")
+
+  @@unique([day])
+  @@index([day])
+  @@map("platform_traffic_days")
+}
+
+model PlatformReferrerDay {
+  id    Int      @id @default(autoincrement())
+  day   DateTime @db.Date
+  name  String
+  count Int      @default(0)
+
+  @@index([day])
+  @@index([day, name])
+  @@map("platform_referrer_days")
+}
+
+model PlatformDeviceShare {
+  id          Int      @id @default(autoincrement())
+  rangeDays   Int      @map("range_days")
+  name        String
+  percent     Decimal  @db.Decimal(5, 2)
+  snapshotAt  DateTime @default(now()) @map("snapshot_at")
+
+  @@unique([rangeDays, name])
+  @@index([rangeDays, snapshotAt])
+  @@map("platform_device_shares")
+}
+
+// ============================================
+// ADMIN TASKS SYSTEM
+// ============================================
+
+model AdminTask {
+  id          Int      @id @default(autoincrement())
+  title       String
+  status      String   @default("todo") // backlog, todo, in_progress, done, canceled
+  label       String   @default("feature") // bug, feature, documentation
+  priority    String   @default("medium") // low, medium, high
+  assignee    String?
+  description String?
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_tasks")
 }

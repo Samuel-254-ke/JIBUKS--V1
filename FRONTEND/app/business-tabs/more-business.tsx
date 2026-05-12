@@ -21,7 +21,7 @@ const MENU_ITEMS: { id: string; label: string; icon: string; route?: string }[] 
     { id: '1', label: 'My Business', icon: 'stats-chart-outline', route: '/business-tabs/business-dashboard' },
     { id: '2', label: 'Bank & Money', icon: 'business-outline', route: '/banking' },
     { id: '3', label: 'Employees', icon: 'people-outline' },
-    { id: '4', label: 'Stock', icon: 'cube-outline', route: '/inventory' },
+    { id: '4', label: 'Stock & Inventory', icon: 'cube-outline', route: '/inventory' },
     { id: '5', label: 'Journal Entry', icon: 'book-outline' },
     { id: '6', label: 'Community', icon: 'people-circle-outline', route: '/(tabs)/community' },
     { id: '7', label: 'Help & Support', icon: 'help-circle-outline' },

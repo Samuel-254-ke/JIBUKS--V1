@@ -102,4 +102,27 @@ async function createUser(req, res, next) {
   }
 }
 
-export { listUsers, createUser, listAllUsersDatabase };
+/**
+ * PATCH /api/users/me/presence — updates lastSeenAt for the authenticated tenant user.
+ * Used by mobile/web clients so Super Admin "Active now" reflects real usage.
+ */
+async function touchPresence(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const now = new Date();
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastSeenAt: now },
+    });
+
+    res.json({ ok: true, lastSeenAt: now.toISOString() });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export { listUsers, createUser, listAllUsersDatabase, touchPresence };

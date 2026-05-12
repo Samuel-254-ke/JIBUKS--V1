@@ -46,12 +46,34 @@ router.get('/', async (req, res) => {
                     select: { purchases: true }
                 },
                 tags: true,
-                stats: true
+                stats: true,
+                expenses: {
+                    orderBy: { date: 'desc' },
+                    take: 1,
+                    select: {
+                        accountId: true,
+                        category: true,
+                        amount: true
+                    }
+                }
             },
             orderBy: { name: 'asc' }
         });
 
-        res.json(vendors);
+        // Map vendors to include last expense info at top level for easy access
+        const vendorsWithLastExpense = vendors.map(v => {
+            const lastExp = v.expenses[0] || null;
+            return {
+                ...v,
+                balance: Number(v.balance),
+                lastExpenseAccountId: lastExp?.accountId,
+                lastExpenseCategory: lastExp?.category,
+                lastExpenseAmount: lastExp ? Number(lastExp.amount) : null,
+                expenses: undefined // Remove the array to keep payload clean
+            };
+        });
+
+        res.json(vendorsWithLastExpense);
     } catch (error) {
         console.error('Error fetching vendors:', error);
         res.status(500).json({ error: 'Failed to fetch vendors' });

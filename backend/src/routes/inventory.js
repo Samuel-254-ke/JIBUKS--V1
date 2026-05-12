@@ -10,6 +10,24 @@ import { verifyJWT as authenticate } from '../middleware/auth.js';
 const router = express.Router();
 
 /**
+ * GET /api/inventory/item-types
+ * List all available item types (Service, Inventory, etc)
+ */
+router.get('/item-types', authenticate, async (req, res) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const types = await prisma.itemType.findMany({
+            where: { tenantId },
+            orderBy: { name: 'asc' }
+        });
+        res.json(types);
+    } catch (error) {
+        console.error('Error fetching item types:', error);
+        res.status(500).json({ error: 'Failed' });
+    }
+});
+
+/**
  * GET /api/inventory
  * List all products (alias for /products for backward compatibility)
  */

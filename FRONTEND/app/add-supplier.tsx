@@ -7,696 +7,348 @@ import {
     TouchableOpacity,
     SafeAreaView,
     TextInput,
-    Switch,
     Alert,
-    Image,
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
+    StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
+import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { useRouter, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiService from '@/services/api';
+
+// Premium Design Palette
+const PRIMARY_BLUE = '#122f8a';
+const SECONDARY_BLUE = '#1a3bb0';
+const ACCENT_ORANGE = '#fe9900';
+const SUCCESS_GREEN = '#2e7d32';
+const TEXT_DARK = '#1e293b';
+const TEXT_MUTED = '#64748b';
+const BORDER_COLOR = '#e2e8f0';
+const BG_COLOR = '#f8fafc';
 
 export default function AddSupplierScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('Name & Contact');
 
-    // Form State
-    const [logo, setLogo] = useState<string | null>(null);
-    const [supplierName, setSupplierName] = useState('');
-    const [category, setCategory] = useState('');
-    const [phone, setPhone] = useState('');
-    const [email, setEmail] = useState('');
-    const [address, setAddress] = useState('');
+    // Section 1: Name and Contact
+    const [formData, setFormData] = useState({
+        title: '',
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        suffix: '',
+        displayName: '',
+        companyName: '',
+        email: '',
+        phone: '',
+        mobile: '',
+        fax: '',
+        other: '',
+        website: '',
+        // Section 2: Address
+        street1: '',
+        street2: '',
+        city: '',
+        province: '',
+        postalCode: '',
+        country: 'Kenya',
+        // Section 3: Notes & Attachments
+        notes: '',
+        // Section 4: Additional Info
+        taxId: '',
+        expenseRate: '',
+        billingRate: '',
+        terms: 'Net 30',
+        accountNo: '',
+        defaultExpenseCategory: '',
+        openingBalance: '0.00',
+        asOfDate: '2026-02-25',
+    });
 
-    // Billing
-    const [accountNumber, setAccountNumber] = useState('');
-    const [preferredPaymentMethod, setPreferredPaymentMethod] = useState('Cash'); // Default
-    const [paymentTerms, setPaymentTerms] = useState('Immediate');
-
-    // Preferences
-    const [defaultCategory, setDefaultCategory] = useState('Utilities: Water');
-    const [autoTagReceipts, setAutoTagReceipts] = useState(true);
-    const [recurringBills, setRecurringBills] = useState('No');
-    const [reminderBeforeDue, setReminderBeforeDue] = useState('3 days');
-
-    // Financial Options
-    const [acceptCheque, setAcceptCheque] = useState(false); // Yes/No
-    const [trackUnpaidBills, setTrackUnpaidBills] = useState(false); // Yes/No
-    const [notes, setNotes] = useState('');
-
-    // Options Lists
-    const categories = ['Utilities', 'School', 'Grocery', 'Transport', 'Other'];
-    const paymentMethods = ['Bank', 'Cash', 'Wallet', 'Cheque'];
-    const paymentTermsOptions = ['Immediate', '7 days', '14 days', '30 days'];
-    const recurringOptions = ['Monthly', 'No'];
-
-    const handlePickImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.5,
+    const updateField = (field: string, value: string) => {
+        setFormData(prev => {
+            const newData = { ...prev, [field]: value };
+            // Auto-fill Display Name if it's empty and name fields change
+            if (field === 'firstName' || field === 'lastName' || field === 'companyName') {
+                if (!prev.displayName) {
+                    newData.displayName = newData.companyName || `${newData.firstName} ${newData.lastName}`.trim();
+                }
+            }
+            return newData;
         });
-
-        if (!result.canceled) {
-            setLogo(result.assets[0].uri);
-        }
     };
 
     const handleSave = async () => {
-        if (!supplierName) {
-            Alert.alert('Required', 'Please enter a supplier name');
+        if (!formData.displayName) {
+            Alert.alert('Required', 'Supplier display name is required');
             return;
         }
 
         setLoading(true);
         try {
-            // Create payload matching backend structure
-            // Using 'category' as a tag since backend supports tags and we have a category chip selection
-            // Create FormData payload for multipart/form-data upload
-            const formData = new FormData();
+            // Transform for backend
+            const payload = {
+                name: formData.displayName,
+                email: formData.email,
+                phone: formData.phone || formData.mobile,
+                address: `${formData.street1}, ${formData.city}`,
+                paymentTerms: formData.terms,
+                // Add more metadata if backend supports it
+                metadata: {
+                    fullName: `${formData.title} ${formData.firstName} ${formData.middleName} ${formData.lastName} ${formData.suffix}`.trim(),
+                    companyName: formData.companyName,
+                    website: formData.website,
+                    province: formData.province,
+                    taxId: formData.taxId,
+                    accountNo: formData.accountNo,
+                    openingBalance: formData.openingBalance,
+                    openingBalanceDate: formData.asOfDate
+                }
+            };
 
-            formData.append('name', supplierName);
-            if (email) formData.append('email', email);
-            if (phone) formData.append('phone', phone);
-            if (address) formData.append('address', address);
-            formData.append('paymentTerms', paymentTerms);
+            await apiService.createVendor(payload);
 
-            // Map category to tags
-            if (category) {
-                // Send tags stringified or as standard form array depending on backend expectation (updated backend parses stringified json or comma separated)
-                // For FormData, appending array usually requires multiple appends with same key or json string
-                formData.append('tags', JSON.stringify([category]));
-            }
-
-            const constructedNotes = `
-${notes}
--- Configuration --
-Preferred Payment: ${preferredPaymentMethod}
-Account Number: ${accountNumber}
-Default Category: ${defaultCategory}
-Auto-Tag Receipts: ${autoTagReceipts ? 'Yes' : 'No'}
-Recurring: ${recurringBills}
-Reminder: ${reminderBeforeDue}
-Accept Cheque: ${acceptCheque ? 'Yes' : 'No'}
-Track Unpaid: ${trackUnpaidBills ? 'Yes' : 'No'}
-            `.trim();
-
-            // Note: Current backend vendor model doesn't have a 'notes' field, only metadata could be used or extending model.
-            // But we can keep it here if the backend ignores extra fields or if we map it later. 
-            // In vendors.js update, we didn't add 'notes' to create/update. 
-            // We can assume user wants these, so maybe we should append to 'address' or strict fields?
-            // Actually, let's skip sending 'notes' if backend doesn't support it to avoid 400 bad request if it's strict.
-            // But standard express body parser usually ignores extra fields.
-            // However, the backend is using `req.body` and picking fields.
-
-            // Handle logo upload
-            if (logo) {
-                const filename = logo.split('/').pop() || 'logo.jpg';
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-                // @ts-ignore
-                formData.append('logo', {
-                    uri: logo,
-                    name: filename,
-                    type,
-                });
-            }
-
-            // Note: apiService.createVendor checks for FormData validation
-            await apiService.createVendor(formData);
-
-
-
-            // Toast success is handled by Toast component in layout usually, but Alert is fine too
-            Alert.alert('Success', 'Supplier added successfully', [
+            Alert.alert('Success', 'Supplier created successfully', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
         } catch (error: any) {
             console.error('Error saving supplier:', error);
-            Alert.alert('Error', error.message || 'Failed to save supplier. Please try again.');
+            Alert.alert('Error', error.message || 'Failed to save supplier');
         } finally {
             setLoading(false);
         }
     };
 
-    const renderChipGroup = (options: string[], selected: string, onSelect: (val: string) => void) => (
-        <View style={styles.chipContainer}>
-            {options.map((option) => (
-                <TouchableOpacity
-                    key={option}
-                    style={[styles.chip, selected === option && styles.chipActive]}
-                    onPress={() => onSelect(option)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={[styles.chipText, selected === option && styles.chipTextActive]}>
-                        {option}
-                    </Text>
-                </TouchableOpacity>
-            ))}
-        </View>
-    );
-
-    const renderToggleGroup = (label: string, value: boolean, onToggle: (val: boolean) => void) => (
-        <View style={styles.toggleRow}>
+    const renderInput = (label: string, field: keyof typeof formData, placeholder = '', icon?: string, half = false) => (
+        <View style={[styles.inputGroup, half && { flex: 1 }]}>
             <Text style={styles.inputLabel}>{label}</Text>
-            <View style={styles.toggleContainer}>
-                <TouchableOpacity
-                    style={[styles.toggleBtn, value && styles.toggleBtnActive]}
-                    onPress={() => onToggle(true)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={[styles.toggleText, value && styles.toggleTextActive]}>Yes</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.toggleBtn, !value && styles.toggleBtnActive]}
-                    onPress={() => onToggle(false)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={[styles.toggleText, !value && styles.toggleTextActive]}>No</Text>
-                </TouchableOpacity>
+            <View style={styles.inputWrapper}>
+                {icon && <Feather name={icon as any} size={16} color={TEXT_MUTED} style={styles.inputIcon} />}
+                <TextInput
+                    style={styles.textInput}
+                    value={formData[field]}
+                    onChangeText={(val) => updateField(field, val)}
+                    placeholder={placeholder}
+                    placeholderTextColor={TEXT_MUTED}
+                />
             </View>
         </View>
     );
+
+    const tabs = ['Name & Contact', 'Address', 'Notes & Attachments', 'Additional Info'];
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.headerContainer}>
-                <LinearGradient
-                    colors={['#122f8a', '#0a1a5c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.headerGradient}
-                >
-                    <View style={styles.headerContent}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" />
+            <Stack.Screen options={{ headerShown: false }} />
+
+            <SafeAreaView edges={['top']} style={styles.headerWrapper}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+                        <Ionicons name="close" size={28} color={TEXT_DARK} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Supplier Information</Text>
+                    <TouchableOpacity
+                        style={[styles.saveBtn, loading && styles.saveBtnDisabled]}
+                        onPress={handleSave}
+                        disabled={loading}
+                    >
+                        {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+
+            <View style={styles.tabsWrapper}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContent}>
+                    {tabs.map(tab => (
+                        <TouchableOpacity
+                            key={tab}
+                            style={[styles.tab, activeTab === tab && styles.tabActive]}
+                            onPress={() => setActiveTab(tab)}
+                        >
+                            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>New Supplier</Text>
-                        <View style={styles.headerIcons}>
-                            <TouchableOpacity style={styles.iconButton}>
-                                <Ionicons name="notifications-outline" size={24} color="#ffffff" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </LinearGradient>
+                    ))}
+                </ScrollView>
             </View>
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
-            >
-                <ScrollView
-                    style={styles.content}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Supplier Profile Card */}
-                    <View style={styles.card}>
-                        <View style={styles.cardHeader}>
-                            <View style={styles.cardIcon}>
-                                <Ionicons name="business" size={20} color="#122f8a" />
-                            </View>
-                            <Text style={styles.cardTitle}>Profile Information</Text>
-                        </View>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-                        <View style={styles.uploadContainer}>
-                            <TouchableOpacity onPress={handlePickImage} style={styles.uploadButton} activeOpacity={0.7}>
-                                {logo ? (
-                                    <Image source={{ uri: logo }} style={styles.logoImage} />
-                                ) : (
-                                    <View style={styles.uploadPlaceholder}>
-                                        <View style={styles.cameraIconCircle}>
-                                            <Ionicons name="camera" size={24} color="#122f8a" />
-                                        </View>
-                                        <Text style={styles.uploadText}>Upload Logo</Text>
-                                    </View>
-                                )}
+                    {activeTab === 'Name & Contact' && (
+                        <View style={styles.section}>
+                            <View style={styles.row}>
+                                {renderInput('Title', 'title', 'Mr/Ms', undefined, true)}
+                                {renderInput('First name', 'firstName', '', undefined, true)}
+                            </View>
+                            <View style={styles.row}>
+                                {renderInput('Middle name', 'middleName', '', undefined, true)}
+                                {renderInput('Last name', 'lastName', '', undefined, true)}
+                            </View>
+                            {renderInput('Suffix', 'suffix', 'Jr/III')}
+                            {renderInput('Supplier display name *', 'displayName', 'How you\'ll see this supplier')}
+                            {renderInput('Company name', 'companyName', '', 'briefcase')}
+                            {renderInput('Email', 'email', 'name@example.com', 'mail')}
+                            <View style={styles.row}>
+                                {renderInput('Phone number', 'phone', '', 'phone', true)}
+                                {renderInput('Mobile number', 'mobile', '', 'smartphone', true)}
+                            </View>
+                            <View style={styles.row}>
+                                {renderInput('Fax', 'fax', '', 'printer', true)}
+                                {renderInput('Other', 'other', '', 'info', true)}
+                            </View>
+                            {renderInput('Website', 'website', 'https://...', 'globe')}
+                        </View>
+                    )}
+
+                    {activeTab === 'Address' && (
+                        <View style={styles.section}>
+                            {renderInput('Street address 1', 'street1', '', 'map-pin')}
+                            {renderInput('Street address 2', 'street2')}
+                            <TouchableOpacity style={styles.addLineBtn}>
+                                <Ionicons name="add" size={20} color={PRIMARY_BLUE} />
+                                <Text style={styles.addLineText}>Add lines</Text>
                             </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Supplier Name *</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={supplierName}
-                                onChangeText={setSupplierName}
-                                placeholder="e.g. Acme Corp"
-                                placeholderTextColor="#9ca3af"
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Category</Text>
-                            {renderChipGroup(categories, category, setCategory)}
-                        </View>
-                    </View>
-
-                    {/* Contact Card */}
-                    <View style={styles.card}>
-                        <View style={styles.cardHeader}>
-                            <View style={[styles.cardIcon, { backgroundColor: '#fff7ed' }]}>
-                                <Ionicons name="call" size={20} color="#fe9900" />
+                            <View style={styles.row}>
+                                {renderInput('City', 'city', '', undefined, true)}
+                                {renderInput('Province', 'province', '', undefined, true)}
                             </View>
-                            <Text style={styles.cardTitle}>Contact Details</Text>
-                        </View>
-
-                        <View style={styles.row}>
-                            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                                <Text style={styles.inputLabel}>Phone</Text>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={phone}
-                                    onChangeText={setPhone}
-                                    keyboardType="phone-pad"
-                                    placeholder="+254..."
-                                    placeholderTextColor="#9ca3af"
-                                />
+                            <View style={styles.row}>
+                                {renderInput('Postal code', 'postalCode', '', undefined, true)}
+                                {renderInput('Country', 'country', 'Kenya', undefined, true)}
                             </View>
-                            <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                                <Text style={styles.inputLabel}>Email</Text>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    keyboardType="email-address"
-                                    placeholder="name@email.com"
-                                    placeholderTextColor="#9ca3af"
-                                />
+
+                            <View style={styles.previewBox}>
+                                <Text style={styles.previewLabel}>Preview address</Text>
+                                <Text style={styles.previewText}>
+                                    {formData.street1 || 'No address provided'}
+                                    {formData.street2 ? `\n${formData.street2}` : ''}
+                                    {formData.city ? `\n${formData.city}, ${formData.province}` : ''}
+                                    {formData.postalCode ? `\n${formData.postalCode}` : ''}
+                                    {`\n${formData.country}`}
+                                </Text>
                             </View>
                         </View>
+                    )}
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Address</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={address}
-                                onChangeText={setAddress}
-                                placeholder="Street, City, Building"
-                                placeholderTextColor="#9ca3af"
-                            />
-                        </View>
-                    </View>
-
-                    {/* Billing Card */}
-                    <View style={styles.card}>
-                        <View style={styles.cardHeader}>
-                            <View style={[styles.cardIcon, { backgroundColor: '#dbeafe' }]}>
-                                <Ionicons name="wallet" size={20} color="#2563eb" />
-                            </View>
-                            <Text style={styles.cardTitle}>Billing & Payment</Text>
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Account Number</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={accountNumber}
-                                onChangeText={setAccountNumber}
-                                placeholder="Utility Acc / Ref Number"
-                                placeholderTextColor="#9ca3af"
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Preferred Method</Text>
-                            {renderChipGroup(paymentMethods, preferredPaymentMethod, setPreferredPaymentMethod)}
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Payment Terms</Text>
-                            {renderChipGroup(paymentTermsOptions, paymentTerms, setPaymentTerms)}
-                        </View>
-                    </View>
-
-                    {/* Preferences Card */}
-                    <View style={styles.card}>
-                        <View style={styles.cardHeader}>
-                            <View style={[styles.cardIcon, { backgroundColor: '#f3e8ff' }]}>
-                                <Ionicons name="options" size={20} color="#9333ea" />
-                            </View>
-                            <Text style={styles.cardTitle}>Configuration</Text>
-                        </View>
-
-                        <View style={styles.switchRow}>
-                            <View>
-                                <Text style={styles.switchTitle}>Auto-Tag Receipts</Text>
-                                <Text style={styles.switchSubtitle}>Automatically categorize uploaded bills</Text>
-                            </View>
-                            <Switch
-                                value={autoTagReceipts}
-                                onValueChange={setAutoTagReceipts}
-                                trackColor={{ false: '#d1d5db', true: '#122f8a' }}
-                                thumbColor="#ffffff"
-                            />
-                        </View>
-
-                        <View style={styles.divider} />
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Recurring Bills?</Text>
-                            {renderChipGroup(recurringOptions, recurringBills, setRecurringBills)}
-                        </View>
-
-                        {recurringBills !== 'No' && (
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Reminder Before Due</Text>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={reminderBeforeDue}
-                                    onChangeText={setReminderBeforeDue}
-                                    placeholder="e.g. 3 days"
-                                    placeholderTextColor="#9ca3af"
-                                />
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Financial Options Card */}
-                    <View style={styles.card}>
-                        <View style={styles.cardHeader}>
-                            <View style={[styles.cardIcon, { backgroundColor: '#fee2e2' }]}>
-                                <Ionicons name="cash" size={20} color="#dc2626" />
-                            </View>
-                            <Text style={styles.cardTitle}>Financial Settings</Text>
-                        </View>
-
-                        <View style={styles.toggleWrapper}>
-                            {renderToggleGroup('Accept Cheques', acceptCheque, setAcceptCheque)}
-                            {renderToggleGroup('Track Unpaid', trackUnpaidBills, setTrackUnpaidBills)}
-                        </View>
-
-                        <View style={styles.inputGroup}>
+                    {activeTab === 'Notes & Attachments' && (
+                        <View style={styles.section}>
                             <Text style={styles.inputLabel}>Notes</Text>
                             <TextInput
-                                style={[styles.textInput, styles.textArea]}
-                                value={notes}
-                                onChangeText={setNotes}
+                                style={styles.textArea}
+                                value={formData.notes}
+                                onChangeText={(val) => updateField('notes', val)}
                                 multiline
-                                numberOfLines={3}
-                                placeholder="Additional details..."
-                                placeholderTextColor="#9ca3af"
+                                placeholder="Add notes about this supplier..."
+                                placeholderTextColor={TEXT_MUTED}
                             />
-                        </View>
-                    </View>
 
-                    <View style={{ height: 20 }} />
+                            <View style={styles.attachmentSection}>
+                                <Text style={styles.inputLabel}>Add attachment</Text>
+                                <TouchableOpacity style={styles.attachmentBox}>
+                                    <View style={styles.attachmentIcon}>
+                                        <Feather name="upload-cloud" size={32} color={PRIMARY_BLUE} />
+                                    </View>
+                                    <Text style={styles.attachmentTitle}>Drop files here or click to upload</Text>
+                                    <Text style={styles.attachmentSub}>Max file size: 20 MB</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
+                    {activeTab === 'Additional Info' && (
+                        <View style={styles.section}>
+                            <View style={styles.subSectionTitle}>
+                                <Ionicons name="calculator" size={18} color={TEXT_DARK} />
+                                <Text style={styles.subSectionText}>Taxes</Text>
+                            </View>
+                            {renderInput('Business ID No. / Social Insurance No.', 'taxId')}
+
+                            <View style={styles.subSectionTitle}>
+                                <Ionicons name="trending-up" size={18} color={TEXT_DARK} />
+                                <Text style={styles.subSectionText}>Expense rates</Text>
+                            </View>
+                            <View style={styles.row}>
+                                {renderInput('Billing rate (/hr)', 'billingRate', '0.00', undefined, true)}
+                                <View style={{ flex: 1 }} />
+                            </View>
+
+                            <View style={styles.subSectionTitle}>
+                                <Ionicons name="card" size={18} color={TEXT_DARK} />
+                                <Text style={styles.subSectionText}>Payments</Text>
+                            </View>
+                            {renderInput('Terms', 'terms', 'Net 30')}
+                            {renderInput('Account no.', 'accountNo')}
+
+                            <View style={styles.subSectionTitle}>
+                                <Ionicons name="book" size={18} color={TEXT_DARK} />
+                                <Text style={styles.subSectionText}>Accounting</Text>
+                            </View>
+                            {renderInput('Default expense category', 'defaultExpenseCategory', 'Choose account')}
+
+                            <View style={styles.subSectionTitle}>
+                                <Ionicons name="wallet" size={18} color={TEXT_DARK} />
+                                <Text style={styles.subSectionText}>Opening balance</Text>
+                            </View>
+                            <View style={styles.row}>
+                                {renderInput('Opening balance', 'openingBalance', '0.00', undefined, true)}
+                                {renderInput('As of', 'asOfDate', '25/02/2026', 'calendar', true)}
+                            </View>
+                        </View>
+                    )}
+
+                    <View style={{ height: 100 }} />
                 </ScrollView>
             </KeyboardAvoidingView>
-
-            {/* Footer Button */}
-            <View style={styles.footerContainer}>
-                <TouchableOpacity
-                    style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-                    onPress={handleSave}
-                    disabled={loading}
-                    activeOpacity={0.8}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#ffffff" />
-                    ) : (
-                        <>
-                            <Ionicons name="checkmark-circle" size={22} color="#ffffff" style={{ marginRight: 8 }} />
-                            <Text style={styles.saveButtonText}>Save Supplier</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
-            </View>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f8fafc',
-    },
-    headerContainer: {
-        backgroundColor: '#122f8a',
-        paddingTop: Platform.OS === 'android' ? 30 : 0,
-    },
-    headerGradient: {
-        paddingHorizontal: 16,
-        paddingBottom: 20,
-        paddingTop: 10,
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#ffffff',
-        letterSpacing: 0.5,
-    },
-    headerIcons: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    content: {
-        flex: 1,
-    },
-    scrollContent: {
-        padding: 16,
-        paddingBottom: 100, // Space for footer
-    },
-    card: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 16,
-        shadowColor: '#64748b',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 20,
-        gap: 12,
-    },
-    cardIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#eff6ff', // Light blue bg
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    cardTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1e293b',
-    },
-    uploadContainer: {
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    uploadButton: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: '#f8fafc',
-        borderWidth: 2,
-        borderColor: '#e2e8f0',
-        borderStyle: 'dashed',
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    uploadPlaceholder: {
-        alignItems: 'center',
-    },
-    cameraIconCircle: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#eff6ff',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 8,
-    },
-    uploadText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#64748b',
-    },
-    logoImage: {
-        width: '100%',
-        height: '100%',
-    },
-    inputGroup: {
-        marginBottom: 20,
-    },
-    inputLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#475569',
-        marginBottom: 8,
-        marginLeft: 2,
-    },
-    textInput: {
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 15,
-        color: '#1e293b',
-    },
-    textArea: {
-        height: 100,
-        textAlignVertical: 'top',
-        paddingTop: 12,
-    },
-    row: {
-        flexDirection: 'row',
-    },
-    chipContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    chip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#f1f5f9',
-        borderWidth: 1,
-        borderColor: 'transparent',
-    },
-    chipActive: {
-        backgroundColor: '#eff6ff',
-        borderColor: '#122f8a',
-    },
-    chipText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#64748b',
-    },
-    chipTextActive: {
-        color: '#122f8a',
-        fontWeight: '700',
-    },
-    switchRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    switchTitle: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1e293b',
-    },
-    switchSubtitle: {
-        fontSize: 12,
-        color: '#64748b',
-        marginTop: 2,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#f1f5f9',
-        marginVertical: 16,
-    },
-    toggleWrapper: {
-        gap: 16,
-        marginBottom: 16,
-    },
-    toggleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    toggleContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#f1f5f9',
-        borderRadius: 8,
-        padding: 4,
-    },
-    toggleBtn: {
-        paddingVertical: 6,
-        paddingHorizontal: 16,
-        borderRadius: 6,
-    },
-    toggleBtnActive: {
-        backgroundColor: '#ffffff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 1,
-    },
-    toggleText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#64748b',
-    },
-    toggleTextActive: {
-        color: '#fe9900',
-        fontWeight: '700',
-    },
-    footerContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#ffffff',
-        padding: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#f1f5f9',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    saveButton: {
-        backgroundColor: '#122f8a',
-        borderRadius: 14,
-        paddingVertical: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#122f8a',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
-    },
-    saveButtonDisabled: {
-        opacity: 0.7,
-    },
-    saveButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#ffffff',
-    },
+    container: { flex: 1, backgroundColor: '#fff' },
+    headerWrapper: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: BORDER_COLOR },
+    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, height: 60 },
+    headerBack: { padding: 5, marginLeft: -5 },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: TEXT_DARK, flex: 1, textAlign: 'center' },
+    saveBtn: { backgroundColor: SUCCESS_GREEN, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 8 },
+    saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+    saveBtnDisabled: { opacity: 0.7 },
+
+    tabsWrapper: { borderBottomWidth: 1, borderBottomColor: BORDER_COLOR },
+    tabsContent: { paddingHorizontal: 15, paddingVertical: 10, gap: 10 },
+    tab: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 20, backgroundColor: '#f1f5f9' },
+    tabActive: { backgroundColor: PRIMARY_BLUE },
+    tabText: { fontSize: 13, color: TEXT_MUTED, fontWeight: '600' },
+    tabTextActive: { color: '#fff' },
+
+    content: { flex: 1, backgroundColor: BG_COLOR },
+    scrollContent: { padding: 20 },
+    section: { backgroundColor: '#fff', borderRadius: 12, padding: 20, borderWidth: 1, borderColor: BORDER_COLOR },
+
+    row: { flexDirection: 'row', gap: 12 },
+    inputGroup: { marginBottom: 18 },
+    inputLabel: { fontSize: 13, fontWeight: 'bold', color: TEXT_DARK, marginBottom: 8 },
+    inputWrapper: { height: 48, backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: BORDER_COLOR, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+    inputIcon: { marginRight: 10 },
+    textInput: { flex: 1, fontSize: 14, color: TEXT_DARK },
+    textArea: { height: 120, backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: BORDER_COLOR, padding: 12, textAlignVertical: 'top', fontSize: 14, color: TEXT_DARK, marginBottom: 20 },
+
+    addLineBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 18 },
+    addLineText: { fontSize: 14, color: PRIMARY_BLUE, fontWeight: '600' },
+
+    previewBox: { backgroundColor: '#f8fafc', borderRadius: 8, padding: 15, borderWidth: 1, borderColor: BORDER_COLOR, borderStyle: 'dashed', marginTop: 10 },
+    previewLabel: { fontSize: 12, fontWeight: 'bold', color: TEXT_MUTED, marginBottom: 8, textTransform: 'uppercase' },
+    previewText: { fontSize: 14, color: TEXT_DARK, lineHeight: 20 },
+
+    attachmentSection: { marginTop: 10 },
+    attachmentBox: { height: 150, borderRadius: 8, borderWidth: 2, borderColor: BORDER_COLOR, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fafbfc' },
+    attachmentIcon: { marginBottom: 10 },
+    attachmentTitle: { fontSize: 14, color: TEXT_DARK, fontWeight: '600' },
+    attachmentSub: { fontSize: 12, color: TEXT_MUTED, marginTop: 4 },
+
+    subSectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, marginBottom: 15 },
+    subSectionText: { fontSize: 15, fontWeight: 'bold', color: TEXT_DARK },
 });

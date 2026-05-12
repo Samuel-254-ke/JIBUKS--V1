@@ -25,6 +25,30 @@ function verifyJWT(req, res, next) {
 }
 
 /**
+ * Middleware to verify Admin JWT token from Authorization header
+ */
+function verifyAdminJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid authorization header for admin' });
+  }
+
+  const token = authHeader.slice(7);
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+    req.admin = decoded; // Attach admin to request
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid or expired admin token' });
+  }
+}
+
+/**
  * Generate JWT token for a user
  */
 function generateToken(user) {
@@ -52,10 +76,39 @@ function generateRefreshToken(user) {
   );
 }
 
+/**
+ * Generate JWT token for an admin
+ */
+function generateAdminToken(admin) {
+  return jwt.sign(
+    {
+      id: admin.id,
+      email: admin.email,
+      isAdmin: true,
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
+/**
+ * Generate refresh token for an admin
+ */
+function generateAdminRefreshToken(admin) {
+  return jwt.sign(
+    { id: admin.id, email: admin.email, isAdmin: true },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
+
 // Export individual functions (named exports)
 export {
   verifyJWT,
+  verifyAdminJWT,
   generateToken,
   generateRefreshToken,
+  generateAdminToken,
+  generateAdminRefreshToken,
   JWT_SECRET,
 };
