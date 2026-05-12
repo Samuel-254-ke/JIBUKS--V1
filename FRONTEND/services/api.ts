@@ -1346,6 +1346,45 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // ─── Family Budget APIs ────────────────────────────────────────────────────
+
+  async getFamilyBudgets(): Promise<any[]> {
+    try {
+      return await this.request('/family/budgets');
+    } catch {
+      return [
+        { id: 1, category: 'food',          label: 'Food',          icon: 'restaurant',      color: '#FF6B6B', limit: 20000, spent: 12000, alertAt80: true,  alertExceeded: true,  type: 'monthly' },
+        { id: 2, category: 'transport',     label: 'Transport',     icon: 'car',             color: '#4ECDC4', limit: 10000, spent: 4000,  alertAt80: true,  alertExceeded: true,  type: 'monthly' },
+        { id: 3, category: 'housing',       label: 'Housing',       icon: 'home',            color: '#3B82F6', limit: 15000, spent: 15000, alertAt80: true,  alertExceeded: true,  type: 'monthly' },
+        { id: 4, category: 'entertainment', label: 'Entertainment', icon: 'game-controller', color: '#F59E0B', limit: 5000,  spent: 6500,  alertAt80: false, alertExceeded: false, type: 'monthly' },
+      ];
+    }
+  }
+
+  async createFamilyBudget(data: {
+    category: string; label: string; icon?: string; color?: string;
+    limit: number; type?: string; alertAt80?: boolean; alertExceeded?: boolean;
+  }): Promise<any> {
+    return this.request('/family/budgets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateFamilyBudget(id: number | string, data: Partial<{
+    category: string; label: string; icon: string; color: string;
+    limit: number; type: string; alertAt80: boolean; alertExceeded: boolean;
+  }>): Promise<any> {
+    return this.request(`/family/budgets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFamilyBudget(id: number | string): Promise<any> {
+    return this.request(`/family/budgets/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const apiService = new ApiService(API_BASE_URL);

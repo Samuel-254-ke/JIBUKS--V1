@@ -57,7 +57,7 @@ const SECTIONS = [
       {
         icon: 'wallet', iconBg: '#FFF7ED', iconColor: '#F97316',
         title: 'Budgets', sub: 'Set and manage monthly budgets',
-        route: '/manage',
+        route: '/budget-categories',
       },
       {
         icon: 'refresh-circle', iconBg: '#EEF2FF', iconColor: '#7C3AED',
