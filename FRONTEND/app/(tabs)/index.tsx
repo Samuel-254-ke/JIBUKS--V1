@@ -10,7 +10,7 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -259,129 +259,6 @@ export default function HomeScreen() {
             <Text style={s.sectionTitle}>Budget Snapshot</Text>
             <TouchableOpacity onPress={() => router.push('/expenses' as any)}>
               <Text style={s.link}>View all</Text>
-
-
-            {/* Creative Financial Dashboard Card */}
-            <View style={styles.financialCard}>
-
-              {/* Main Balance */}
-              <View style={styles.mainBalanceSection}>
-                <Text style={styles.balanceLabel}>REAL AVAILABLE CASH</Text>
-                <Text style={styles.balanceAmount}>
-                  KES {chequeSummary.realAvailable.toLocaleString('en-KE', { minimumFractionDigits: 0 })}
-                </Text>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Three-Column Stats Grid */}
-              <View style={styles.statsGrid}>
-                {/* Money In */}
-                <View style={styles.statItem}>
-                  <View style={[styles.statIcon, { backgroundColor: '#dcfce7' }]}>
-                    <Ionicons name="arrow-down" size={14} color="#15803d" />
-                  </View>
-                  <View>
-                    <Text style={styles.statLabel}>Money In</Text>
-                    <Text style={styles.statValue}>1.5M</Text>
-                  </View>
-                </View>
-
-                <View style={styles.verticalDivider} />
-
-                {/* Money Out */}
-                <View style={styles.statItem}>
-                  <View style={[styles.statIcon, { backgroundColor: '#fee2e2' }]}>
-                    <Ionicons name="arrow-up" size={14} color="#ef4444" />
-                  </View>
-                  <View>
-                    <Text style={styles.statLabel}>Money Out</Text>
-                    <Text style={styles.statValue}>320k</Text>
-                  </View>
-                </View>
-
-                <View style={styles.verticalDivider} />
-
-                {/* Cash */}
-                <View style={styles.statItem}>
-                  <View style={[styles.statIcon, { backgroundColor: '#e0f2fe' }]}>
-                    <Ionicons name="wallet" size={14} color="#0284c7" />
-                  </View>
-                  <View>
-                    <Text style={styles.statLabel}>Bank Bal</Text>
-                    <Text style={styles.statValue}>
-                      {chequeSummary.bankBalance >= 1000
-                        ? (chequeSummary.bankBalance / 1000).toFixed(1) + 'k'
-                        : chequeSummary.bankBalance.toLocaleString()}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* Quick Actions Grid */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.actionsGrid}>
-
-
-
-            {/* 1. Invoices */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/invoices' as any)}>
-              <View style={[styles.actionIcon, { backgroundColor: '#e0f2fe' }]}>
-                <MaterialCommunityIcons name="file-document-edit-outline" size={26} color="#0284c7" />
-              </View>
-              <Text style={styles.actionLabel}>Invoices</Text>
-            </TouchableOpacity>
-
-            {/* 2. Expenses & Bills */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/expenses-and-bills' as any)}>
-              <View style={[styles.actionIcon, { backgroundColor: '#fee2e2' }]}>
-                <MaterialCommunityIcons name="receipt-text-outline" size={26} color="#ef4444" />
-              </View>
-              <Text style={styles.actionLabel}>Expenses & Bills</Text>
-            </TouchableOpacity>
-
-            {/* 3. Debt Tracker */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/lending')}>
-              <View style={[styles.actionIcon, { backgroundColor: '#F3E8FF' }]}>
-                <MaterialCommunityIcons name="account-clock-outline" size={26} color="#9333EA" />
-              </View>
-              <Text style={styles.actionLabel}>Debt Tracker</Text>
-            </TouchableOpacity>
-
-            {/* 4. Add Loan */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/add-loan')}>
-              <View style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
-                <MaterialCommunityIcons name="bank-transfer-in" size={26} color="#EF4444" />
-              </View>
-              <Text style={styles.actionLabel}>Add Loan</Text>
-            </TouchableOpacity>
-
-            {/* 5. Stock & Inventory */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/inventory' as any)}>
-              <View style={[styles.actionIcon, { backgroundColor: '#fffbe6' }]}>
-                <MaterialCommunityIcons name="cube-outline" size={26} color="#d4b106" />
-              </View>
-              <Text style={styles.actionLabel}>Stock & Inventory</Text>
-            </TouchableOpacity>
-
-            {/* 6. Create Cheque */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/write-cheque')}>
-              <View style={[styles.actionIcon, { backgroundColor: '#eef2ff' }]}>
-                <MaterialCommunityIcons name="checkbook" size={26} color="#4338ca" />
-              </View>
-              <Text style={styles.actionLabel}>Write Cheque</Text>
-            </TouchableOpacity>
-
-            {/* 7. Cash Purchase */}
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/cash-purchase')}>
-              <View style={[styles.actionIcon, { backgroundColor: '#ecfdf5' }]}>
-                <MaterialCommunityIcons name="cash-minus" size={26} color="#059669" />
-              </View>
-              <Text style={styles.actionLabel}>Cash Out</Text>
-
             </TouchableOpacity>
           </View>
           {budgets.map((b: any, i: number) => (
@@ -392,7 +269,6 @@ export default function HomeScreen() {
             />
           ))}
         </View>
-
 
         {/* ── SAVINGS GOALS ────────────────────────────────────────── */}
         <View style={s.section}>
@@ -414,26 +290,6 @@ export default function HomeScreen() {
                   <Text style={s.goalName} numberOfLines={1}>{g.name}</Text>
                   <Text style={s.goalSub}>
                     KES {(g.currentAmount / 1000).toFixed(0)}k / {(g.targetAmount / 1000).toFixed(0)}k
-
-
-
-
-        {/* Pending Cheques Widget */}
-        {chequeSummary.count > 0 && (
-          <View style={styles.sectionContainer}>
-            <TouchableOpacity
-              style={styles.pendingChequesWidget}
-              onPress={() => router.push('/(tabs)/transactions')}
-            >
-              <View style={styles.pendingChequesLeft}>
-                <View style={styles.pendingChequesIcon}>
-                  <Ionicons name="time-outline" size={24} color="#d97706" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pendingChequesTitle}>Pending Cheques</Text>
-                  <Text style={styles.pendingChequesSubtitle}>
-                    {chequeSummary.count} {chequeSummary.count === 1 ? 'cheque' : 'cheques'} waiting to clear
-
                   </Text>
                 </TouchableOpacity>
               );
