@@ -10,31 +10,16 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Switch,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import apiService from '@/services/api';
 
-const { width } = Dimensions.get('window');
-
-// Premium Design System
-const COLORS = {
-  primary: '#122f8a',      // Deep Blue
-  secondary: '#fe9900',    // Brand Orange
-  success: '#10b981',
-  danger: '#ef4444',
-  text: '#1e293b',
-  textLight: '#64748b',
-  bg: '#f1f5f9',
-  white: '#ffffff',
-  border: '#e2e8f0',
-  cardBg: '#ffffff',
-};
 
 type TaxTreatment = 'Exclusive of Tax' | 'Inclusive of Tax' | 'Out of Scope of Tax';
 
@@ -52,7 +37,7 @@ export default function ExpenseScreen() {
   const router = useRouter();
 
   // --- CORE STATE ---
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [payee, setPayee] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -63,6 +48,7 @@ export default function ExpenseScreen() {
   const [refNo, setRefNo] = useState('');
   const [taxTreatment, setTaxTreatment] = useState<TaxTreatment>('Exclusive of Tax');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [splitMode, setSplitMode] = useState(false);
 
 
   // --- DATA ---
@@ -170,7 +156,7 @@ export default function ExpenseScreen() {
     }
 
     try {
-      setLoading(true);
+      setSaving(true);
 
       const payload = {
         type: 'EXPENSE',
@@ -202,25 +188,10 @@ export default function ExpenseScreen() {
       console.error(error);
       Alert.alert('Error', error.message || 'Failed to save expense');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-
-  const resetForm = () => {
-    setPayee('');
-    setCategory(null);
-    setDescription('');
-    setAmount('');
-    setMember(null);
-    setPhoneNumber('');
-    setMeterNumber('');
-    setReference('');
-    setReceipt(null);
-    setTaxAmount('');
-    setSplitMode(false);
-    setSplitLines([{ id: 1, category: null, description: '', amount: '', member: null }]);
-  };
 
   // ── Figma quick-category tiles ──────────────────────────────────────────────
   const QUICK_CATS = [
@@ -232,225 +203,198 @@ export default function ExpenseScreen() {
   ];
 
   const selectQuickCat = (key: string) => {
-    const matched = categories.find(c =>
-      c.name.toLowerCase().includes(key) || key.includes(c.name.toLowerCase())
+    const matched = expenseAccounts.find((a: any) =>
+      a.name.toLowerCase().includes(key) || key.includes(a.name.toLowerCase())
     );
-    setCategory(matched ?? { id: key, name: key.charAt(0).toUpperCase() + key.slice(1), type: 'expense' });
+    const cat = matched ?? { id: key, name: key.charAt(0).toUpperCase() + key.slice(1) };
+    updateLineItem(0, 'categoryId', String(cat.id));
+    updateLineItem(0, 'categoryName', cat.name);
   };
 
   const dateLabel = (() => {
     const today = new Date();
-    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (paymentDate.toDateString() === today.toDateString()) return 'Today';
     const yday = new Date(today); yday.setDate(today.getDate() - 1);
-    if (date.toDateString() === yday.toDateString()) return 'Yesterday';
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    if (paymentDate.toDateString() === yday.toDateString()) return 'Yesterday';
+    return paymentDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   })();
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1a3a8f" />
-
-  // --- UI COMPONENTS ---
   if (pageLoading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-
+      <View style={s.center}>
+        <ActivityIndicator size="large" color="#1a3a8f" />
       </View>
     );
   }
 
-  const selectedAccountName = accounts.find(a => String(a.id) === selectedAccountId)?.name || 'Select Account';
+  const selectedAccountName = accounts.find((a: any) => String(a.id) === selectedAccountId)?.name || 'Select Account';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={s.root}>
       <StatusBar barStyle="light-content" />
 
-
-      {/* ── HEADER ── */}
-      <LinearGradient colors={['#1a3a8f', '#0e2470']} style={styles.header}>
-        <SafeAreaView>
-          <View style={styles.headerRow}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={22} color="#FFAA00" />
-
       {/* Header */}
-      <LinearGradient colors={[COLORS.primary, '#0a1a5c']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+      <LinearGradient colors={['#1a3a8f', '#0e2470']} style={s.header}>
+        <View style={s.headerRow}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color="#FFAA00" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Record Expense</Text>
-          <View style={{ width: 24 }} />
+          <Text style={s.headerTitle}>Add Expense</Text>
+          <View style={{ width: 38 }} />
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 100 }}>
-
-        {/* Main Info Card */}
-        <View style={styles.card}>
-          <View style={styles.field}>
-            <Text style={styles.label}>Who did you pay? (Payee/Supplier)</Text>
-            <TouchableOpacity style={styles.selector} onPress={() => setShowSupplierModal(true)}>
-              <Text style={styles.selectorText}>{payee || 'Select Supplier'}</Text>
-              <Ionicons name="people-outline" size={18} color={COLORS.primary} />
-
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Add Expense</Text>
-            <View style={{ width: 38 }} />
-          </View>
-
-
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-          {/* ── AMOUNT CARD ── */}
-          <View style={styles.amountCard}>
-            <Text style={styles.amountCardLabel}>AMOUNT</Text>
-            <View style={styles.amountDisplay}>
-              <Text style={styles.amountCurrency}>KES</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                placeholderTextColor="#CBD5E1"
-              />
+          {/* Amount display */}
+          <View style={s.amountCard}>
+            <Text style={s.amountCardLabel}>TOTAL AMOUNT</Text>
+            <View style={s.amountDisplay}>
+              <Text style={s.amountCurrency}>KES</Text>
+              <Text style={s.amountValue}>{parseFloat(totalAmount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}</Text>
             </View>
-            <TouchableOpacity style={styles.datePill}>
+            <TouchableOpacity style={s.datePill} onPress={() => setShowDatePicker(true)}>
               <Ionicons name="calendar" size={14} color="#6B7280" />
-              <Text style={styles.datePillText}>{dateLabel}</Text>
+              <Text style={s.datePillText}>{dateLabel}</Text>
             </TouchableOpacity>
           </View>
 
-          {/* ── CATEGORY ── */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Category</Text>
-              <TouchableOpacity onPress={() => setShowCategoryModal(true)}>
-                <Text style={styles.viewAll}>View All</Text>
+          {/* Payee */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Who did you pay?</Text>
+            <TouchableOpacity style={s.selector} onPress={() => setShowSupplierModal(true)}>
+              <Ionicons name="people-outline" size={18} color="#1a3a8f" style={{ marginRight: 8 }} />
+              <Text style={[s.selectorText, !payee && { color: '#9CA3AF' }]}>{payee || 'Select Supplier'}</Text>
+              <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+            <TextInput
+              style={[s.input, { marginTop: 8 }]}
+              placeholder="Or type payee name..."
+              placeholderTextColor="#9CA3AF"
+              value={payee}
+              onChangeText={setPayee}
+            />
+          </View>
+
+          {/* Quick categories */}
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>Category</Text>
+              <TouchableOpacity onPress={() => { setActiveLineIndex(0); setShowCategoryModal(true); }}>
+                <Text style={s.link}>View All</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.catGrid}>
+            <View style={s.catGrid}>
               {QUICK_CATS.map((qc) => {
-                const active = category?.name?.toLowerCase().includes(qc.key);
+                const active = lineItems[0].categoryName?.toLowerCase().includes(qc.key);
                 return (
-                  <TouchableOpacity
-                    key={qc.key}
-                    style={[styles.catCard, active && styles.catCardActive]}
-                    onPress={() => selectQuickCat(qc.key)}
-                  >
-                    <Text style={styles.catEmoji}>{qc.emoji}</Text>
-                    <Text style={[styles.catLabel, active && styles.catLabelActive]}>{qc.label}</Text>
+                  <TouchableOpacity key={qc.key}
+                    style={[s.catCard, active && s.catCardActive]}
+                    onPress={() => selectQuickCat(qc.key)}>
+                    <Text style={s.catEmoji}>{qc.emoji}</Text>
+                    <Text style={[s.catLabel, active && s.catLabelActive]}>{qc.label}</Text>
                   </TouchableOpacity>
                 );
               })}
-              <TouchableOpacity
-                style={[
-                  styles.catCard,
-                  (category && !QUICK_CATS.some(q => category?.name?.toLowerCase().includes(q.key))) && styles.catCardActive,
-                ]}
-                onPress={() => setShowCategoryModal(true)}
-              >
+              <TouchableOpacity style={s.catCard} onPress={() => { setActiveLineIndex(0); setShowCategoryModal(true); }}>
                 <Ionicons name="add" size={22} color="#6B7280" />
-                <Text style={styles.catLabel}>More</Text>
-
-
-          <View style={styles.row}>
-            <View style={[styles.field, { flex: 1, marginRight: 10 }]}>
-              <Text style={styles.label}>Payment Account</Text>
-              <TouchableOpacity style={styles.selector} onPress={() => setShowAccountModal(true)}>
-                <Text style={styles.selectorText} numberOfLines={1}>{selectedAccountName}</Text>
-                <Ionicons name="chevron-down" size={18} color={COLORS.textLight} />
+                <Text style={s.catLabel}>More</Text>
               </TouchableOpacity>
-              <Text style={styles.balanceText}>Balance: <Text style={{ fontWeight: '700', color: COLORS.success }}>KES {accountBalance.toLocaleString()}</Text></Text>
             </View>
+          </View>
 
-            <View style={[styles.field, { flex: 1 }]}>
-              <Text style={styles.label}>Total Amount</Text>
-              <View style={styles.amountBox}>
-                <Text style={styles.currencyPrefix}>KES</Text>
-                <Text style={styles.totalAmountText}>{parseFloat(totalAmount).toLocaleString()}</Text>
+          {/* Account + Payment method */}
+          <View style={s.section}>
+            <View style={s.row}>
+              <View style={[s.field, { flex: 1, marginRight: 10 }]}>
+                <Text style={s.label}>Account</Text>
+                <TouchableOpacity style={s.selector} onPress={() => setShowAccountModal(true)}>
+                  <Text style={s.selectorText} numberOfLines={1}>{selectedAccountName}</Text>
+                  <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+                <Text style={s.balText}>Bal: <Text style={{ color: '#22C55E', fontWeight: '700' }}>KES {accountBalance.toLocaleString()}</Text></Text>
+              </View>
+              <View style={[s.field, { flex: 1 }]}>
+                <Text style={s.label}>Method</Text>
+                <TouchableOpacity style={s.selector} onPress={() => setShowPaymentMethodModal(true)}>
+                  <Text style={s.selectorText}>{paymentMethod}</Text>
+                  <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* Details Card */}
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={[styles.field, { flex: 1, marginRight: 10 }]}>
-              <Text style={styles.label}>Payment Date</Text>
-              <TouchableOpacity style={styles.selector} onPress={() => setShowDatePicker(true)}>
-                <Ionicons name="calendar-outline" size={18} color={COLORS.primary} style={{ marginRight: 8 }} />
-                <Text style={styles.selectorText}>{paymentDate.toLocaleDateString()}</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Line items */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Line Items</Text>
+            {lineItems.map((item, index) => (
+              <View key={item.id} style={s.itemCard}>
+                <View style={s.itemHeader}>
+                  <Text style={s.itemIndex}>#{index + 1}</Text>
+                  <TouchableOpacity onPress={() => removeLine(index)}>
+                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={s.selector} onPress={() => { setActiveLineIndex(index); setShowCategoryModal(true); }}>
+                  <Text style={s.selectorText}>{item.categoryName}</Text>
+                  <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+                <View style={[s.row, { marginTop: 8, gap: 8 }]}>
+                  <TextInput
+                    style={[s.input, { flex: 2 }]}
+                    placeholder="Description"
+                    placeholderTextColor="#9CA3AF"
+                    value={item.description}
+                    onChangeText={(v) => updateLineItem(index, 'description', v)}
+                  />
+                  <TextInput
+                    style={[s.input, { flex: 1 }]}
+                    placeholder="0.00"
+                    keyboardType="decimal-pad"
+                    value={item.amount}
+                    onChangeText={(v) => updateLineItem(index, 'amount', v)}
+                  />
+                </View>
+                <TouchableOpacity style={s.vatPill} onPress={() => { setActiveLineIndex(index); setShowVatModal(true); }}>
+                  <Text style={s.vatPillText}>Tax: {item.vatRate}%</Text>
+                  <Ionicons name="chevron-down" size={14} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={s.addLineBtn} onPress={addLine}>
+              <Ionicons name="add-circle" size={22} color="#1a3a8f" />
+              <Text style={s.addLineTxt}>Add another item</Text>
+            </TouchableOpacity>
+          </View>
 
-            <View style={[styles.field, { flex: 1 }]}>
-              <Text style={styles.label}>Payment Method</Text>
-              <TouchableOpacity style={styles.selector} onPress={() => setShowPaymentMethodModal(true)}>
-                <Text style={styles.selectorText}>{paymentMethod}</Text>
-                <Ionicons name="chevron-down" size={18} color={COLORS.textLight} />
-
-              </TouchableOpacity>
+          {/* Ref + Tax treatment */}
+          <View style={s.section}>
+            <View style={s.row}>
+              <View style={[s.field, { flex: 1, marginRight: 10 }]}>
+                <Text style={s.label}>Ref No.</Text>
+                <TextInput style={s.input} placeholder="Reference #" value={refNo} onChangeText={setRefNo} />
+              </View>
+              <View style={[s.field, { flex: 1 }]}>
+                <Text style={s.label}>Amounts are</Text>
+                <TouchableOpacity style={s.selector} onPress={() => setShowTaxTreatmentModal(true)}>
+                  <Text style={s.selectorText} numberOfLines={1}>{taxTreatment}</Text>
+                  <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-
-          {/* ── DETAILS ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Details</Text>
-            <View style={styles.detailsRow}>
-              <TextInput
-                style={styles.detailsInput}
-                placeholder="What was this for?"
-                placeholderTextColor="#9CA3AF"
-                value={description || payee}
-                onChangeText={(t) => { setDescription(t); setPayee(t); }}
-              />
-              <TouchableOpacity style={styles.cameraBtn} onPress={pickImage}>
-                {receipt ? (
-                  <Image source={{ uri: receipt }} style={{ width: 28, height: 28, borderRadius: 6 }} />
-                ) : (
-                  <Ionicons name="camera" size={22} color="#fff" />
-                )}
-
-          <View style={styles.row}>
-            <View style={[styles.field, { flex: 1, marginRight: 10 }]}>
-              <Text style={styles.label}>Ref No.</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Reference #"
-                value={refNo}
-                onChangeText={setRefNo}
-              />
-            </View>
-
-            <View style={[styles.field, { flex: 1 }]}>
-              <Text style={styles.label}>Amounts are</Text>
-              <TouchableOpacity style={styles.selector} onPress={() => setShowTaxTreatmentModal(true)}>
-                <Text style={styles.selectorText} numberOfLines={1}>{taxTreatment}</Text>
-                <Ionicons name="chevron-down" size={18} color={COLORS.textLight} />
-
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-
-          {/* ── SPLIT WITH FAMILY ── */}
-          <View style={styles.section}>
-            <View style={styles.splitFamilyRow}>
-              <View style={styles.splitLeft}>
-                <View style={styles.splitIcon}>
+          {/* Split with family */}
+          <View style={s.section}>
+            <View style={s.splitRow}>
+              <View style={s.splitLeft}>
+                <View style={s.splitIcon}>
                   <Ionicons name="people" size={18} color="#1a3a8f" />
                 </View>
                 <View>
-                  <Text style={styles.splitFamilyTitle}>Split with Family?</Text>
-                  <Text style={styles.splitFamilySub}>Instantly divide with your household</Text>
+                  <Text style={s.splitTitle}>Split with Family?</Text>
+                  <Text style={s.splitSub}>Instantly divide with your household</Text>
                 </View>
               </View>
               <Switch
@@ -462,11 +406,11 @@ export default function ExpenseScreen() {
             </View>
           </View>
 
-          {/* ── SUBMIT ── */}
-          <View style={styles.section}>
+          {/* Submit */}
+          <View style={s.section}>
             <TouchableOpacity
-              style={[styles.submitBtn, saving && { opacity: 0.7 }]}
-              onPress={save}
+              style={[s.submitBtn, saving && { opacity: 0.7 }]}
+              onPress={handleSave}
               disabled={saving}
             >
               {saving ? (
@@ -474,455 +418,196 @@ export default function ExpenseScreen() {
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                  <Text style={styles.submitTxt}>Add Expense</Text>
+                  <Text style={s.submitTxt}>Save Expense</Text>
                 </>
               )}
             </TouchableOpacity>
-
-        {/* Line Items Section */}
-        <Text style={styles.sectionTitle}>Line Items</Text>
-        {lineItems.map((item, index) => (
-          <View key={item.id} style={styles.itemCard}>
-            <View style={styles.itemHeader}>
-              <Text style={styles.itemIndex}>#{index + 1}</Text>
-              <TouchableOpacity onPress={() => removeLine(index)}>
-                <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.label}>Category</Text>
-              <TouchableOpacity
-                style={styles.selector}
-                onPress={() => {
-                  setActiveLineIndex(index);
-                  setShowCategoryModal(true);
-                }}
-              >
-                <Text style={styles.selectorText}>{item.categoryName}</Text>
-                <Ionicons name="chevron-down" size={18} color={COLORS.textLight} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.label}>Description</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="What was this for?"
-                value={item.description}
-                onChangeText={(v) => updateLineItem(index, 'description', v)}
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.field, { flex: 2, marginRight: 10 }]}>
-                <Text style={styles.label}>Amount</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="0.00"
-                  keyboardType="decimal-pad"
-                  value={item.amount}
-                  onChangeText={(v) => updateLineItem(index, 'amount', v)}
-                />
-              </View>
-              <View style={[styles.field, { flex: 1 }]}>
-                <Text style={styles.label}>Tax Rate</Text>
-                <TouchableOpacity
-                  style={styles.selector}
-                  onPress={() => {
-                    setActiveLineIndex(index);
-                    setShowVatModal(true);
-                  }}
-                >
-                  <Text style={styles.selectorTextSmall}>{item.vatRate}%</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-          </View>
-        ))}
-
-
-          {/* ── FOOTER ── */}
-          <View style={styles.footer}>
-            <Text style={styles.footerTxt}>Powered by </Text>
-            <Text style={styles.footerBrand}>Apbc 🌍</Text>
           </View>
 
           <View style={{ height: 60 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 
-
-      {/* ── ACCOUNT MODAL ── */}
-      <Modal visible={showAccountModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Account</Text>
-              <TouchableOpacity onPress={() => setShowAccountModal(false)}>
-                <Ionicons name="close" size={24} color="#1F2937" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalScroll}>
-              {accounts.map((acc) => (
-                <TouchableOpacity
-                  key={acc.id}
-                  style={[styles.modalItem, account?.id === acc.id && styles.modalItemActive]}
-                  onPress={() => { setAccount(acc); setShowAccountModal(false); }}
-                >
-                  <Ionicons name="wallet" size={22} color="#1a3a8f" />
-                  <Text style={[styles.modalItemText, { flex: 1 }]}>{acc.name}</Text>
-                  {account?.id === acc.id && (
-                    <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── CATEGORY MODAL ── */}
-      <Modal visible={showCategoryModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choose Category</Text>
-              <TouchableOpacity onPress={() => { setShowCategoryModal(false); setActiveSplitLine(null); }}>
-                <Ionicons name="close" size={24} color="#1F2937" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalScroll}>
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.modalItem, category?.id === cat.id && styles.modalItemActive]}
-                  onPress={() => {
-                    if (activeSplitLine !== null) {
-                      updateSplitLine(activeSplitLine, 'category', cat);
-                      setActiveSplitLine(null);
-                    } else {
-                      setCategory(cat);
-                    }
-                    setShowCategoryModal(false);
-                  }}
-                >
-                  <Text style={styles.catEmojiSm}>{cat.icon || '💰'}</Text>
-                  <Text style={styles.modalItemText}>{cat.name}</Text>
-                  {category?.id === cat.id && (
-                    <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-        <TouchableOpacity style={styles.addLineBtn} onPress={addLine}>
-          <Ionicons name="add-circle" size={24} color={COLORS.primary} />
-          <Text style={styles.addLineText}>Add another item</Text>
-        </TouchableOpacity>
-
-      </ScrollView>
-
-      {/* Bottom Save Action */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.saveBtn, loading && styles.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={loading}
-        >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Expense</Text>}
-        </TouchableOpacity>
-      </View>
-
-      {/* --- MODALS --- */}
-
+      {/* Modals */}
       <SelectionModal
-        visible={showAccountModal}
-        title="Payment Account"
-        options={accounts.map(a => ({ label: a.name, value: String(a.id), balance: a.balance }))}
+        visible={showAccountModal} title="Payment Account"
+        options={accounts.map((a: any) => ({ label: a.name, value: String(a.id), balance: a.balance }))}
         onSelect={(val: string) => {
           setSelectedAccountId(val);
-          const acc = accounts.find(a => String(a.id) === val);
+          const acc = accounts.find((a: any) => String(a.id) === val);
           setAccountBalance(acc?.balance || 0);
           setShowAccountModal(false);
         }}
         onClose={() => setShowAccountModal(false)}
       />
-
       <SelectionModal
-        visible={showCategoryModal}
-        title="Select Expense Account"
-        options={expenseAccounts.map(a => ({ label: `${a.code ? a.code + ' - ' : ''}${a.name}`, value: String(a.id), name: a.name }))}
+        visible={showCategoryModal} title="Select Expense Category"
+        options={expenseAccounts.map((a: any) => ({ label: `${a.code ? a.code + ' - ' : ''}${a.name}`, value: String(a.id) }))}
         onSelect={(val: string) => {
-          const acc = expenseAccounts.find(a => String(a.id) === val);
+          const acc = expenseAccounts.find((a: any) => String(a.id) === val);
           updateLineItem(activeLineIndex, 'categoryId', val);
-          updateLineItem(activeLineIndex, 'categoryName', acc.name);
+          updateLineItem(activeLineIndex, 'categoryName', acc?.name || val);
           setShowCategoryModal(false);
         }}
         onClose={() => setShowCategoryModal(false)}
       />
-
       <SelectionModal
-        visible={showSupplierModal}
-        title="Select Supplier"
-        options={suppliers.map(s => ({
-          label: s.name,
-          value: String(s.id),
-          balance: s.balance,
-          lastAmount: s.lastExpenseAmount,
-          lastCategory: s.lastExpenseCategory,
-          lastAccountId: s.lastExpenseAccountId
-        }))}
+        visible={showSupplierModal} title="Select Supplier"
+        options={suppliers.map((s: any) => ({ label: s.name, value: String(s.id) }))}
         onSelect={(val: string) => {
-          const sup = suppliers.find(s => String(s.id) === val);
+          const sup = suppliers.find((s: any) => String(s.id) === val);
           setSelectedSupplierId(val);
-          setPayee(sup.name);
-
-          // Autofill Amount and Category from last expense
-          if (sup.lastExpenseAmount || sup.lastExpenseCategory) {
-            const newItems = [...lineItems];
-            if (sup.lastExpenseAmount) {
-              newItems[0].amount = String(sup.lastExpenseAmount);
+          setPayee(sup?.name || '');
+          if (sup?.lastExpenseAmount) {
+            const items = [...lineItems];
+            items[0].amount = String(sup.lastExpenseAmount);
+            if (sup.lastExpenseAccountId) {
+              items[0].categoryId = String(sup.lastExpenseAccountId);
+              items[0].categoryName = sup.lastExpenseCategory || '';
             }
-            if (sup.lastExpenseCategory && sup.lastExpenseAccountId) {
-              newItems[0].categoryId = String(sup.lastExpenseAccountId);
-              newItems[0].categoryName = sup.lastExpenseCategory;
-            }
-            setLineItems(newItems);
-          } else if (sup.balance > 0) {
-            // Fallback to balance if no last expense
-            const newItems = [...lineItems];
-            newItems[0].amount = String(sup.balance);
-            setLineItems(newItems);
+            setLineItems(items);
           }
-
           setShowSupplierModal(false);
         }}
         onClose={() => setShowSupplierModal(false)}
       />
-
-
       <SelectionModal
-        visible={showPaymentMethodModal}
-        title="Payment Method"
+        visible={showPaymentMethodModal} title="Payment Method"
         options={['Cash', 'M-Pesa', 'Bank Transfer', 'Credit Card', 'Cheque'].map(m => ({ label: m, value: m }))}
-        onSelect={(val: string) => {
-          setPaymentMethod(val);
-          setShowPaymentMethodModal(false);
-        }}
+        onSelect={(val: string) => { setPaymentMethod(val); setShowPaymentMethodModal(false); }}
         onClose={() => setShowPaymentMethodModal(false)}
       />
-
       <SelectionModal
-        visible={showTaxTreatmentModal}
-        title="Amounts are"
+        visible={showTaxTreatmentModal} title="Amounts are"
         options={[
           { label: 'Exclusive of Tax', value: 'Exclusive of Tax' },
           { label: 'Inclusive of Tax', value: 'Inclusive of Tax' },
           { label: 'Out of Scope of Tax', value: 'Out of Scope of Tax' },
         ]}
-        onSelect={(val: any) => {
-          setTaxTreatment(val);
-          setShowTaxTreatmentModal(false);
-        }}
+        onSelect={(val: any) => { setTaxTreatment(val); setShowTaxTreatmentModal(false); }}
         onClose={() => setShowTaxTreatmentModal(false)}
       />
-
       <SelectionModal
-        visible={showVatModal}
-        title="Select Tax Rate"
-        options={vatRates.map(v => ({ label: `${v.name} (${v.rate}%)`, value: String(v.id), rate: v.rate }))}
+        visible={showVatModal} title="Select Tax Rate"
+        options={vatRates.map((v: any) => ({ label: `${v.name} (${v.rate}%)`, value: String(v.id), rate: v.rate }))}
         onSelect={(val: string) => {
-          const v = vatRates.find(rate => String(rate.id) === val);
+          const v = vatRates.find((r: any) => String(r.id) === val);
           updateLineItem(activeLineIndex, 'vatRateId', val);
-          updateLineItem(activeLineIndex, 'vatRate', v.rate);
+          updateLineItem(activeLineIndex, 'vatRate', v?.rate || 0);
           setShowVatModal(false);
         }}
         onClose={() => setShowVatModal(false)}
       />
 
-      {/* Simple Date Picker (Fallback) */}
       <Modal visible={showDatePicker} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.datePickerCard}>
-            <Text style={styles.modalTitle}>Set Date</Text>
-            <View style={styles.dateRow}>
-              <TextInput
-                style={styles.dateInput}
-                defaultValue={paymentDate.getDate().toString()}
-                keyboardType="numeric"
-                onChangeText={(v) => {
-                  const d = new Date(paymentDate);
-                  d.setDate(parseInt(v) || 1);
-                  setPaymentDate(d);
-                }}
-              />
-              <TextInput
-                style={styles.dateInput}
-                defaultValue={(paymentDate.getMonth() + 1).toString()}
-                keyboardType="numeric"
-                onChangeText={(v) => {
-                  const d = new Date(paymentDate);
-                  d.setMonth((parseInt(v) || 1) - 1);
-                  setPaymentDate(d);
-                }}
-              />
-              <TextInput
-                style={[styles.dateInput, { width: 80 }]}
-                defaultValue={paymentDate.getFullYear().toString()}
-                keyboardType="numeric"
-                onChangeText={(v) => {
-                  const d = new Date(paymentDate);
-                  d.setFullYear(parseInt(v) || 2026);
-                  setPaymentDate(d);
-                }}
-              />
+        <View style={s.modalOverlay}>
+          <View style={s.dateCard}>
+            <Text style={s.modalTitle}>Set Date</Text>
+            <View style={s.dateRow}>
+              <TextInput style={s.dateInput} defaultValue={paymentDate.getDate().toString()} keyboardType="numeric"
+                onChangeText={(v) => { const d = new Date(paymentDate); d.setDate(parseInt(v) || 1); setPaymentDate(d); }} />
+              <TextInput style={s.dateInput} defaultValue={(paymentDate.getMonth() + 1).toString()} keyboardType="numeric"
+                onChangeText={(v) => { const d = new Date(paymentDate); d.setMonth((parseInt(v) || 1) - 1); setPaymentDate(d); }} />
+              <TextInput style={[s.dateInput, { width: 80 }]} defaultValue={paymentDate.getFullYear().toString()} keyboardType="numeric"
+                onChangeText={(v) => { const d = new Date(paymentDate); d.setFullYear(parseInt(v) || 2026); setPaymentDate(d); }} />
             </View>
-            <TouchableOpacity style={styles.confirmBtn} onPress={() => setShowDatePicker(false)}>
-              <Text style={styles.confirmBtnText}>Confirm</Text>
+            <TouchableOpacity style={s.confirmBtn} onPress={() => setShowDatePicker(false)}>
+              <Text style={s.confirmBtnText}>Confirm</Text>
             </TouchableOpacity>
-
           </View>
         </View>
       </Modal>
-
-
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F7FA' },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#6B7280' },
-  header: { paddingBottom: 16, paddingHorizontal: 20 },
+function SelectionModal({ visible, title, options, onSelect, onClose }: {
+  visible: boolean; title: string;
+  options: { label: string; value: string; balance?: number; rate?: number }[];
+  onSelect: (val: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={s.modalOverlay}>
+        <View style={s.modal}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#1F2937" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={s.modalScroll}>
+            {options.map((opt) => (
+              <TouchableOpacity key={opt.value} style={s.modalItem} onPress={() => onSelect(opt.value)}>
+                <Text style={[s.modalItemText, { flex: 1 }]}>{opt.label}</Text>
+                {opt.balance != null && <Text style={s.modalItemSub}>KES {opt.balance.toLocaleString()}</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F5F7FA' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { paddingBottom: 16, paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 0 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFAA00' },
   scroll: { paddingBottom: 20 },
   amountCard: { marginHorizontal: 16, marginTop: 12, marginBottom: 8, backgroundColor: '#fff', borderRadius: 20, padding: 20, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
   amountCardLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.5, marginBottom: 8 },
-  amountDisplay: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  amountDisplay: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   amountCurrency: { fontSize: 22, fontWeight: '600', color: '#9CA3AF' },
-  amountInput: { fontSize: 42, fontWeight: '800', color: '#1F2937', minWidth: 120 },
+  amountValue: { fontSize: 38, fontWeight: '800', color: '#1F2937' },
   datePill: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12, backgroundColor: '#F5F7FA', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: '#E5E7EB' },
   datePillText: { fontSize: 13, fontWeight: '600', color: '#374151' },
   section: { paddingHorizontal: 16, marginBottom: 16 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
-  viewAll: { fontSize: 13, fontWeight: '600', color: '#1a3a8f' },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 10 },
+  link: { fontSize: 13, fontWeight: '600', color: '#1a3a8f' },
+  selector: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: '#E5E7EB' },
+  selectorText: { flex: 1, fontSize: 14, fontWeight: '500', color: '#1F2937' },
+  input: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 14, color: '#1F2937', borderWidth: 1.5, borderColor: '#E5E7EB' },
+  balText: { fontSize: 11, color: '#6B7280', marginTop: 4 },
+  label: { fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 6 },
+  field: {},
+  row: { flexDirection: 'row', alignItems: 'flex-start' },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   catCard: { width: '30%', aspectRatio: 1, backgroundColor: '#fff', borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, borderWidth: 1.5, borderColor: 'transparent' },
   catCardActive: { borderColor: '#1a3a8f', backgroundColor: '#EEF2FF' },
   catEmoji: { fontSize: 26 },
   catLabel: { fontSize: 11, fontWeight: '600', color: '#6B7280', textAlign: 'center' },
   catLabelActive: { color: '#1a3a8f' },
-  detailsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  detailsInput: { flex: 1, fontSize: 14, color: '#1F2937', paddingVertical: 14 },
-  cameraBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center' },
-  splitFamilyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  splitLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  splitIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  splitFamilyTitle: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
-  splitFamilySub: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
-  submitBtn: { backgroundColor: '#F97316', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: '#F97316', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+  itemCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: '#E5E7EB' },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  itemIndex: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
+  vatPill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, alignSelf: 'flex-start', backgroundColor: '#F5F7FA', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#E5E7EB' },
+  vatPillText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  addLineBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, justifyContent: 'center' },
+  addLineTxt: { fontSize: 14, fontWeight: '600', color: '#1a3a8f' },
+  splitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#E5E7EB' },
+  splitLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  splitIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  splitTitle: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
+  splitSub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1a3a8f', borderRadius: 16, paddingVertical: 16 },
   submitTxt: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 8 },
-  footerTxt: { fontSize: 12, color: '#9CA3AF' },
-  footerBrand: { fontSize: 12, fontWeight: '700', color: '#1a3a8f' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%' as any, paddingBottom: 30 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  modal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%' as any },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: '#1F2937' },
   modalScroll: { paddingHorizontal: 16 },
-  modalItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
-  modalItemActive: { backgroundColor: '#F0FDF4' },
-  modalItemText: { fontSize: 15, color: '#1F2937', flex: 1 },
-  catEmojiSm: { fontSize: 20 },
-
-    </SafeAreaView>
-  );
-}
-
-const SelectionModal = ({ visible, title, options, onSelect, onClose }: any) => (
-  <Modal visible={visible} transparent animationType="slide">
-    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-      <View style={styles.modal}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>{title}</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView style={{ maxHeight: 400 }}>
-          {options.map((opt: any) => (
-            <TouchableOpacity key={opt.value} style={styles.modalItem} onPress={() => onSelect(opt.value)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalItemText}>{opt.label}</Text>
-                {opt.balance !== undefined && <Text style={styles.modalItemSubtext}>Bal: KES {opt.balance.toLocaleString()}</Text>}
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={COLORS.border} />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    </TouchableOpacity>
-  </Modal>
-);
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { paddingBottom: 20, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
-  headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 10 },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  backBtn: { padding: 4 },
-
-  scrollView: { flex: 1, padding: 16 },
-  card: { backgroundColor: COLORS.cardBg, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-
-  field: { marginBottom: 16 },
-  label: { fontSize: 12, fontWeight: '700', color: COLORS.textLight, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  textInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, padding: 12, fontSize: 15, color: COLORS.text },
-
-  row: { flexDirection: 'row' },
-  selector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, padding: 12 },
-  selectorText: { fontSize: 15, color: COLORS.text, fontWeight: '500' },
-  selectorTextSmall: { fontSize: 14, color: COLORS.text },
-
-  balanceText: { fontSize: 12, color: COLORS.textLight, marginTop: 4, marginLeft: 2 },
-  amountBox: { backgroundColor: '#eff6ff', borderRadius: 12, padding: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#bfdbfe' },
-  currencyPrefix: { fontSize: 11, color: COLORS.primary, fontWeight: '800' },
-  totalAmountText: { fontSize: 20, fontWeight: '800', color: COLORS.primary },
-
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 12, marginLeft: 4 },
-
-  itemCard: { backgroundColor: COLORS.cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: COLORS.secondary, shadowColor: '#000', shadowOpacity: 0.02, elevation: 1 },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  itemIndex: { fontSize: 12, fontWeight: '800', color: COLORS.secondary },
-
-  addLineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: COLORS.primary, borderRadius: 12, marginTop: 10 },
-  addLineText: { marginLeft: 8, fontSize: 15, fontWeight: '700', color: COLORS.primary },
-
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', padding: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20, borderTopWidth: 1, borderTopColor: COLORS.border },
-  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 16, padding: 18, alignItems: 'center', shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  saveBtnDisabled: { opacity: 0.7 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-
-  // Modals
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingBottom: 30, maxHeight: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 24, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
-  modalItem: { flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  modalItemText: { fontSize: 16, color: COLORS.text, fontWeight: '600' },
-  modalItemSubtext: { fontSize: 12, color: COLORS.success, marginTop: 2 },
-
-  datePickerCard: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '80%', alignSelf: 'center', marginBottom: '50%' },
-  dateRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 20 },
-  dateInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, padding: 10, width: 50, textAlign: 'center', fontSize: 16, fontWeight: '700' },
-  confirmBtn: { backgroundColor: COLORS.primary, padding: 15, borderRadius: 12, alignItems: 'center' },
-  confirmBtnText: { color: '#fff', fontWeight: '800' }
-
+  modalItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F9FAFB', gap: 10 },
+  modalItemText: { fontSize: 15, color: '#1F2937' },
+  modalItemSub: { fontSize: 12, color: '#6B7280' },
+  dateCard: { margin: 20, backgroundColor: '#fff', borderRadius: 20, padding: 24 },
+  dateRow: { flexDirection: 'row', gap: 10, marginVertical: 16 },
+  dateInput: { flex: 1, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, padding: 10, textAlign: 'center', fontSize: 16 },
+  confirmBtn: { backgroundColor: '#1a3a8f', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  confirmBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
