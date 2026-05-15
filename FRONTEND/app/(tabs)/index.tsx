@@ -178,10 +178,11 @@ export default function HomeScreen() {
     }
   };
 
-  const summary = dashData?.summary ?? { totalIncome: 142500, totalExpenses: 8000, balance: 142500 };
-  const goals = dashData?.goals?.slice(0, 4) ?? MOCK_GOALS;
-  const budgets = dashData?.categorySpending?.slice(0, 3) ?? MOCK_BUDGETS;
-  const recentTx = dashData?.recentTransactions?.slice(0, 3) ?? MOCK_TX;
+  const summary    = dashData?.summary ?? { totalIncome: 142500, totalExpenses: 8000, balance: 142500 };
+  const goals       = dashData?.goals?.slice(0, 4) ?? MOCK_GOALS;
+  const budgets     = dashData?.categorySpending?.slice(0, 3) ?? MOCK_BUDGETS;
+  const recentTx    = dashData?.recentTransactions?.slice(0, 3) ?? MOCK_TX;
+  const alerts: any[] = dashData?.budgetAlerts ?? [];
   const budgetUsedPct = summary.totalIncome > 0
     ? Math.min(Math.round((summary.totalExpenses / summary.totalIncome) * 100), 100)
     : 79;
@@ -208,9 +209,11 @@ export default function HomeScreen() {
             {/* Bell */}
             <TouchableOpacity style={s.bell}>
               <Ionicons name="notifications" size={20} color={C.white} />
-              <View style={s.bellBadge}>
-                <Text style={s.bellBadgeText}>6</Text>
-              </View>
+              {alerts.length > 0 && (
+                <View style={s.bellBadge}>
+                  <Text style={s.bellBadgeText}>{alerts.length}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -304,31 +307,32 @@ export default function HomeScreen() {
         </View>
 
         {/* ── UPCOMING ALERTS ──────────────────────────────────────── */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Upcoming Alerts</Text>
-            <TouchableOpacity>
-              <Text style={s.link}>View all</Text>
-            </TouchableOpacity>
+        {alerts.length > 0 && (
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>Upcoming Alerts</Text>
+              <TouchableOpacity onPress={() => router.push('/budget-alerts' as any)}>
+                <Text style={s.link}>View all</Text>
+              </TouchableOpacity>
+            </View>
+            {alerts.map((a: any, i: number) => (
+              <View key={i}>
+                {i > 0 && <View style={{ height: 10 }} />}
+                <AlertRow
+                  icon={a.type === 'over' ? 'warning' : 'flash'}
+                  iconBg={a.type === 'over' ? '#FFF0F0' : '#FFF9E6'}
+                  iconColor={a.type === 'over' ? C.danger : C.warn}
+                  title={a.title}
+                  sub={a.sub}
+                  arrow={a.type !== 'over'}
+                  action={a.type === 'over'
+                    ? { label: 'Review', onPress: () => router.push('/expenses' as any) }
+                    : undefined}
+                />
+              </View>
+            ))}
           </View>
-          <AlertRow
-            icon="flash"
-            iconBg="#FFF9E6"
-            iconColor={C.warn}
-            title="Electricity Bill"
-            sub="Due in 3 days · KES 4,200"
-            action={{ label: 'Pay Now', onPress: () => router.push('/add-expense' as any) }}
-          />
-          <View style={{ height: 10 }} />
-          <AlertRow
-            icon="warning"
-            iconBg="#FFF0F0"
-            iconColor={C.danger}
-            title="Food Budget Low"
-            sub="KES 800 remaining"
-            arrow
-          />
-        </View>
+        )}
 
         {/* ── RECENT ACTIVITY ──────────────────────────────────────── */}
         <View style={s.section}>

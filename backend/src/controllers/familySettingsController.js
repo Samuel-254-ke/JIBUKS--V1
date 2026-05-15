@@ -333,56 +333,97 @@ export async function getDashboardStats(req, res, next) {
 
         if (!tenantId) return res.status(404).json({ error: 'Not part of a family' });
 
-        const [family, goals, budgets] = await Promise.all([
+        // Current month boundaries
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        const [family, goals, budgets, transactions] = await Promise.all([
             prisma.tenant.findUnique({
                 where: { id: tenantId },
-                include: {
-                    users: { select: { id: true } }
-                }
+                include: { users: { select: { id: true } } }
             }),
             prisma.goal.findMany({
                 where: { tenantId, status: 'ACTIVE' },
-                select: {
-                    id: true,
-                    name: true,
-                    targetAmount: true,
-                    currentAmount: true,
-                    targetDate: true
-                },
+                select: { id: true, name: true, targetAmount: true, currentAmount: true, targetDate: true },
                 orderBy: { createdAt: 'desc' },
-                take: 3
+                take: 4
             }),
-            prisma.budget.findMany({
-                where: { tenantId },
-                select: {
-                    category: true,
-                    amount: true
-                }
+            prisma.budget.findMany({ where: { tenantId } }),
+            prisma.transaction.findMany({
+                where: { tenantId, date: { gte: monthStart, lte: monthEnd } },
+                orderBy: { date: 'desc' },
             })
         ]);
 
         if (!family) return res.status(404).json({ error: 'Family not found' });
 
-        const totalBudget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
+        // ── Summary ──────────────────────────────────────────────────────────
+        const totalIncome   = transactions.filter(t => t.type === 'INCOME')
+            .reduce((s, t) => s + Number(t.amount), 0);
+        const totalExpenses = transactions.filter(t => t.type === 'EXPENSE')
+            .reduce((s, t) => s + Number(t.amount), 0);
+
+        // ── Spending per category ─────────────────────────────────────────────
+        const spendMap = {};
+        transactions.filter(t => t.type === 'EXPENSE').forEach(t => {
+            spendMap[t.category] = (spendMap[t.category] || 0) + Number(t.amount);
+        });
+
+        const categorySpending = budgets.map(b => {
+            const spent  = spendMap[b.category] || 0;
+            const budget = Number(b.amount);
+            return {
+                category: b.category,
+                budget,
+                spent,
+                pct: budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0,
+            };
+        });
+
+        // ── Budget alerts (≥80 % used) ────────────────────────────────────────
+        const budgetAlerts = categorySpending
+            .filter(b => b.pct >= 80)
+            .sort((a, b) => b.pct - a.pct)
+            .slice(0, 3)
+            .map(b => ({
+                type:  b.pct >= 100 ? 'over' : 'warn',
+                title: b.pct >= 100 ? `${b.category} Over Budget` : `${b.category} Budget Low`,
+                sub:   b.pct >= 100
+                    ? `KES ${(b.spent - b.budget).toLocaleString()} over`
+                    : `KES ${(b.budget - b.spent).toLocaleString()} remaining`,
+                pct: b.pct,
+            }));
+
+        // ── Recent transactions ───────────────────────────────────────────────
+        const recentTransactions = transactions.slice(0, 5).map(t => ({
+            id:            t.id,
+            type:          t.type,
+            amount:        Number(t.amount),
+            description:   t.description,
+            category:      t.category,
+            date:          t.date,
+            paymentMethod: t.paymentMethod,
+        }));
 
         res.json({
-            familyName: family.name,
+            familyName:   family.name,
             totalMembers: family.users.length,
-            activeGoals: goals.length,
-            totalBudget,
-            monthlySpending: 0, // TODO: Calculate from transactions
-            recentGoals: goals.map(g => ({
-                id: g.id,
-                name: g.name,
-                target: Number(g.targetAmount),
-                current: Number(g.currentAmount),
-                deadline: g.targetDate ? new Date(g.targetDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'No deadline'
+            summary: {
+                totalIncome,
+                totalExpenses,
+                balance: totalIncome - totalExpenses,
+            },
+            goals: goals.map(g => ({
+                id:            g.id,
+                name:          g.name,
+                targetAmount:  Number(g.targetAmount),
+                currentAmount: Number(g.currentAmount),
+                targetDate:    g.targetDate,
             })),
-            budgetOverview: budgets.slice(0, 3).map(b => ({
-                category: b.category,
-                allocated: Number(b.amount),
-                spent: 0 // TODO: Calculate from transactions
-            }))
+            categorySpending,
+            recentTransactions,
+            budgetAlerts,
         });
     } catch (err) {
         next(err);
