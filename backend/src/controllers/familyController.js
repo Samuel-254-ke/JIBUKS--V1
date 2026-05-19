@@ -174,7 +174,7 @@ export async function createMember(req, res, next) {
 export async function createGoal(req, res, next) {
     try {
         const { tenantId, id: userId } = req.user;
-        const { name, targetAmount, targetDate, monthlyContribution, assignedUserId } = req.body;
+        const { name, targetAmount, targetDate, monthlyContribution, assignedUserId, category } = req.body;
 
         if (!tenantId) return res.status(403).json({ error: 'Not part of a family' });
 
@@ -195,6 +195,7 @@ export async function createGoal(req, res, next) {
             data: {
                 tenantId,
                 name,
+                category: category || null,
                 targetAmount,
                 targetDate: targetDate ? new Date(targetDate) : null,
                 monthlyContribution: monthlyContribution ? parseFloat(monthlyContribution) : null,
@@ -328,11 +329,32 @@ export async function getBudgets(req, res, next) {
             return res.status(403).json({ error: 'You do not have permission to view budgets' });
         }
 
-        const budgets = await prisma.budget.findMany({
-            where: { tenantId }
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        const [budgets, transactions] = await Promise.all([
+            prisma.budget.findMany({ where: { tenantId } }),
+            prisma.transaction.findMany({
+                where: { tenantId, type: 'EXPENSE', date: { gte: monthStart, lte: monthEnd } },
+                select: { category: true, amount: true },
+            }),
+        ]);
+
+        const spendMap = {};
+        transactions.forEach(t => {
+            spendMap[t.category] = (spendMap[t.category] || 0) + Number(t.amount);
         });
 
-        res.json(budgets);
+        const enriched = budgets.map(b => ({
+            id:       b.id,
+            category: b.category,
+            amount:   Number(b.amount),
+            spent:    spendMap[b.category] || 0,
+            month:    b.month,
+        }));
+
+        res.json(enriched);
     } catch (err) {
         next(err);
     }
