@@ -89,11 +89,11 @@ export default function AddSavingGoalsScreen() {
             setLoading(true);
             await apiService.createGoal({
                 name: goalName,
-                targetAmount: parseFloat(targetAmount),
-                targetDate: targetDate,
-                monthlyContribution: parseFloat(monthlyContribution),
+                targetAmount: parseFloat(targetAmount) || 0,
+                targetDate: targetDate || undefined,
+                monthlyContribution: parseFloat(monthlyContribution) || 0,
                 category,
-                assignedUserIds: selectedMembers.length > 0 ? selectedMembers : undefined,
+                assignedUserId: selectedMembers.length > 0 ? selectedMembers[0] : undefined,
             });
 
             setGoalName('');

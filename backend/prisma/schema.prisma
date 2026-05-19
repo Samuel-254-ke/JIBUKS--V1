@@ -253,6 +253,7 @@ model Goal {
   id                  Int        @id @default(autoincrement())
   tenantId            Int
   name                String
+  category            String?
   targetAmount        Decimal
   currentAmount       Decimal    @default(0)
   targetDate          DateTime?

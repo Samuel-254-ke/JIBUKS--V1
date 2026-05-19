@@ -16,6 +16,26 @@ const C = {
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+const CAT_META: Record<string, { icon: string; color: string }> = {
+    'Food & Groceries':  { icon: 'restaurant',     color: '#EF4444' },
+    'Housing & Rent':    { icon: 'home',            color: '#3B82F6' },
+    'Transport':         { icon: 'car',             color: '#8B5CF6' },
+    'Utilities':         { icon: 'flash',           color: '#F59E0B' },
+    'Education':         { icon: 'school',          color: '#10B981' },
+    'Health':            { icon: 'medical',         color: '#EC4899' },
+    'Entertainment':     { icon: 'game-controller', color: '#6366F1' },
+    'Clothing':          { icon: 'shirt',           color: '#14B8A6' },
+    'Savings':           { icon: 'wallet',          color: '#22C55E' },
+    'Personal Care':     { icon: 'happy',           color: '#F97316' },
+};
+
+function getCatMeta(category: string) {
+    const exact = CAT_META[category];
+    if (exact) return exact;
+    const key = Object.keys(CAT_META).find(k => category.toLowerCase().includes(k.toLowerCase()));
+    return key ? CAT_META[key] : { icon: 'wallet', color: '#6B7280' };
+}
+
 export default function BudgetCategoriesScreen() {
     const router = useRouter();
     const [budgets, setBudgets] = useState<any[]>([]);
@@ -44,8 +64,8 @@ export default function BudgetCategoriesScreen() {
     const now = new Date();
     const monthLabel = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
 
-    const totalLimit = budgets.reduce((s, b) => s + (Number(b.limit) || 0), 0);
-    const totalSpent = budgets.reduce((s, b) => s + (Number(b.spent) || 0), 0);
+    const totalLimit = budgets.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+    const totalSpent = budgets.reduce((s, b) => s + (Number(b.spent)  || 0), 0);
     const totalRemaining = Math.max(totalLimit - totalSpent, 0);
     const totalPct = totalLimit > 0 ? Math.min((totalSpent / totalLimit) * 100, 100) : 0;
     const isOnTrack = totalSpent <= totalLimit;
@@ -149,22 +169,23 @@ export default function BudgetCategoriesScreen() {
 
                 <View style={s.catList}>
                     {budgets.map((b) => {
-                        const spent = Number(b.spent) || 0;
-                        const limit = Number(b.limit) || 0;
+                        const spent = Number(b.spent)  || 0;
+                        const limit = Number(b.amount) || 0;
                         const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
                         const over = spent > limit;
-                        const barColor = over ? C.red : b.color || C.navy;
+                        const meta = getCatMeta(b.category);
+                        const barColor = over ? C.red : meta.color;
 
                         return (
                             <TouchableOpacity key={b.id} style={s.catRow}
                                 onPress={() => router.push({ pathname: '/edit-budget', params: { budgetId: b.id.toString() } } as any)}
                                 activeOpacity={0.8}>
-                                <View style={[s.catIcon, { backgroundColor: (b.color || '#3B82F6') + '20' }]}>
-                                    <Ionicons name={b.icon || 'wallet'} size={22} color={b.color || C.navy} />
+                                <View style={[s.catIcon, { backgroundColor: meta.color + '20' }]}>
+                                    <Ionicons name={meta.icon as any} size={22} color={meta.color} />
                                 </View>
                                 <View style={s.catInfo}>
                                     <View style={s.catNameRow}>
-                                        <Text style={s.catName}>{b.label}</Text>
+                                        <Text style={s.catName}>{b.category}</Text>
                                         {over
                                             ? <Text style={s.overBadge}>OVER BUDGET</Text>
                                             : <Text style={s.catPct}>{Math.round(pct)}%</Text>

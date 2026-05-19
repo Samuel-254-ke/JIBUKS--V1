@@ -857,11 +857,8 @@ class ApiService {
     try {
       return await this.request<Transaction[]>(`/transactions${suffix}`);
     } catch (error) {
-      console.warn('getTransactions falling back to mock transactions');
-      const filtered = params.type
-        ? this.mockTransactions.filter(t => t.type === params.type)
-        : this.mockTransactions;
-      return filtered.slice(0, params.limit || filtered.length);
+      console.error('getTransactions failed:', error);
+      return [];
     }
   }
 
@@ -869,18 +866,8 @@ class ApiService {
     try {
       return await this.request<TransactionStats>('/transactions/stats');
     } catch (error) {
-      console.warn('getTransactionStats falling back to mock stats');
-      const income = this.mockTransactions
-        .filter(t => t.type === 'INCOME')
-        .reduce((sum, t) => sum + t.amount, 0);
-      const expenses = this.mockTransactions
-        .filter(t => t.type === 'EXPENSE')
-        .reduce((sum, t) => sum + t.amount, 0);
-      return {
-        totalIncome: income,
-        totalExpenses: expenses,
-        net: income - expenses,
-      };
+      console.error('getTransactionStats failed:', error);
+      return { totalIncome: 0, totalExpenses: 0, net: 0 };
     }
   }
 
@@ -920,26 +907,8 @@ class ApiService {
     try {
       return await this.request('/family/dashboard');
     } catch (error) {
-      console.warn('getDashboard falling back to mock data');
-      // Return mock dashboard data
-      return {
-        familyMembers: [
-          { id: '1', name: 'You', role: 'OWNER' }
-        ],
-        goals: [],
-        budgets: [],
-        categorySpending: [],
-        recentTransactions: this.mockTransactions.slice(0, 5),
-        summary: {
-          totalIncome: this.mockTransactions
-            .filter(t => t.type === 'INCOME')
-            .reduce((sum, t) => sum + t.amount, 0),
-          totalExpenses: this.mockTransactions
-            .filter(t => t.type === 'EXPENSE')
-            .reduce((sum, t) => sum + t.amount, 0),
-          balance: 0
-        }
-      };
+      console.error('getDashboard failed:', error);
+      return null;
     }
   }
 
@@ -1381,13 +1350,9 @@ class ApiService {
   async getFamilyBudgets(): Promise<any[]> {
     try {
       return await this.request('/family/budgets');
-    } catch {
-      return [
-        { id: 1, category: 'food',          label: 'Food',          icon: 'restaurant',      color: '#FF6B6B', limit: 20000, spent: 12000, alertAt80: true,  alertExceeded: true,  type: 'monthly' },
-        { id: 2, category: 'transport',     label: 'Transport',     icon: 'car',             color: '#4ECDC4', limit: 10000, spent: 4000,  alertAt80: true,  alertExceeded: true,  type: 'monthly' },
-        { id: 3, category: 'housing',       label: 'Housing',       icon: 'home',            color: '#3B82F6', limit: 15000, spent: 15000, alertAt80: true,  alertExceeded: true,  type: 'monthly' },
-        { id: 4, category: 'entertainment', label: 'Entertainment', icon: 'game-controller', color: '#F59E0B', limit: 5000,  spent: 6500,  alertAt80: false, alertExceeded: false, type: 'monthly' },
-      ];
+    } catch (error) {
+      console.error('getFamilyBudgets failed:', error);
+      return [];
     }
   }
 

@@ -1,457 +1,294 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  SectionList,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
-  Dimensions,
   Platform,
   StatusBar,
   ActivityIndicator,
   RefreshControl,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import apiService from '../../services/api';
-import Toast from 'react-native-toast-message';
+import apiService from '@/services/api';
 
-const { width } = Dimensions.get('window');
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const C = {
+  navy: '#1a3a8f', navyDark: '#0e2470', accent: '#F97316', gold: '#F59E0B',
+  bg: '#F5F7FA', white: '#ffffff', text: '#1F2937', textMid: '#374151',
+  textLight: '#6B7280', border: '#E5E7EB', success: '#22C55E', danger: '#EF4444',
+  card: '#ffffff',
+};
 
-export default function SuppliersScreen() {
+type Filter = 'ALL' | 'INCOME' | 'EXPENSE';
+
+function txIcon(tx: any): any {
+  const desc = (tx.description || tx.category || '').toLowerCase();
+  if (tx.type === 'INCOME') return 'arrow-down-circle';
+  if (desc.includes('uber') || desc.includes('ride') || desc.includes('transport')) return 'car';
+  if (desc.includes('food') || desc.includes('grocery') || desc.includes('super')) return 'cart';
+  if (desc.includes('school') || desc.includes('edu')) return 'school';
+  if (desc.includes('health') || desc.includes('hospital') || desc.includes('medical')) return 'medical';
+  if (desc.includes('util') || desc.includes('electric') || desc.includes('water')) return 'flash';
+  return 'receipt';
+}
+
+function groupByDate(txs: any[]): { title: string; data: any[] }[] {
+  const map = new Map<string, any[]>();
+  txs.forEach(tx => {
+    const d = new Date(tx.date);
+    const key = d.toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(tx);
+  });
+  return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
+}
+
+export default function ActivityScreen() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [allTx, setAllTx]     = useState<any[]>([]);
+  const [filter, setFilter]   = useState<Filter>('ALL');
+  const [search, setSearch]   = useState('');
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchSuppliers = async () => {
+  useFocusEffect(useCallback(() => { load(); }, []));
+
+  const load = async () => {
     try {
-      const data = await apiService.getVendors();
-      // Filter filtering in memory for now based on local search query to avoid too many API calls while typing
-      // Ideally API handles search, but for small lists this is fine. 
-      // If the API supports search param we can use that too.
-      // The backend DOES support search query now!
-      if (searchQuery) {
-        const searchData = await apiService.getVendors({ active: undefined }); // Re-fetch with search would require modifying API signature or handling search in memory
-        // Since getVendors definition in api.ts doesn't explicitly expose 'search' param in the interface yet (it only has active), 
-        // let's stick to in-memory filtering for the displayed list or update api.ts.
-        // Updating api.ts is cleaner but for now let's just filter locally on the fetched list 
-        // to match the previous behavior but with real data.
-      }
-      setSuppliers(data);
-      console.log('Fetched suppliers:', JSON.stringify(data, null, 2));
-    } catch (error) {
-      console.error('Failed to fetch suppliers:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to load suppliers',
-      });
+      setLoading(true);
+      const data = await apiService.getTransactions({ limit: 100 });
+      setAllTx(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Failed to load transactions:', e);
+      setAllTx([]);
     } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+      setLoading(false);
     }
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchSuppliers();
-    }, [])
-  );
-
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchSuppliers();
+    await load();
+    setRefreshing(false);
   };
 
-  const filteredSuppliers = suppliers.filter(supplier =>
-    supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (supplier.email && supplier.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const fmt = (n: number) => `KES ${Number(n).toLocaleString('en-KE')}`;
 
-  const totalSuppliers = suppliers.length;
-  const activeSuppliers = suppliers.filter(s => s.isActive).length;
-  // Calculate total outstanding balance from suppliers (if available in backend response)
-  // The backend response for vendor includes 'balance'
-  const totalOutstanding = suppliers.reduce((sum, s) => sum + (Number(s.balance) || 0), 0);
+  const filtered = allTx.filter(tx => {
+    if (filter === 'INCOME'  && tx.type !== 'INCOME')  return false;
+    if (filter === 'EXPENSE' && tx.type !== 'EXPENSE') return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (tx.description || '').toLowerCase().includes(q)
+          || (tx.category   || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
 
-  const getInitials = (name: string) => {
-    return name ? name.substring(0, 2).toUpperCase() : '??';
-  };
+  const sections = groupByDate(filtered);
 
-  const getStatusColor = (isActive: boolean) => {
-    return isActive ? '#10b981' : '#9ca3af';
-  };
-
-  const formatCurrency = (amount: number) => {
-    return `KES ${amount.toLocaleString()}`;
-  };
+  const income   = allTx.filter(t => t.type === 'INCOME' ).reduce((s, t) => s + Number(t.amount), 0);
+  const expenses = allTx.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#122f8a" />
+    <View style={s.root}>
+      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-      {/* Creative Header */}
-      <View style={styles.headerContainer}>
-        <LinearGradient
-          colors={['#122f8a', '#0a1a5c']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          {/* Header Content */}
-          <View style={styles.headerTop}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+      {/* ── HEADER ── */}
+      <LinearGradient colors={[C.navy, C.navyDark]} style={s.header}>
+        <View style={s.headerTop}>
+          <View>
+            <Text style={s.headerTitle}>Activity</Text>
+            <Text style={s.headerSub}>{allTx.length} transactions</Text>
+          </View>
+          <TouchableOpacity style={s.addBtn} onPress={() => router.push('/add-expense' as any)}>
+            <Ionicons name="add" size={22} color={C.white} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Income / Expense summary */}
+        <View style={s.summaryRow}>
+          <View style={s.summaryItem}>
+            <View style={s.summaryIcon}>
+              <Ionicons name="arrow-down" size={14} color={C.success} />
+            </View>
+            <View>
+              <Text style={s.summaryLabel}>Income</Text>
+              <Text style={s.summaryAmt}>{fmt(income)}</Text>
+            </View>
+          </View>
+          <View style={s.divider} />
+          <View style={s.summaryItem}>
+            <View style={[s.summaryIcon, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
+              <Ionicons name="arrow-up" size={14} color={C.danger} />
+            </View>
+            <View>
+              <Text style={s.summaryLabel}>Expenses</Text>
+              <Text style={[s.summaryAmt, { color: C.danger }]}>{fmt(expenses)}</Text>
+            </View>
+          </View>
+          <View style={s.divider} />
+          <View style={s.summaryItem}>
+            <View style={[s.summaryIcon, { backgroundColor: 'rgba(249,115,22,0.15)' }]}>
+              <Ionicons name="wallet" size={14} color={C.accent} />
+            </View>
+            <View>
+              <Text style={s.summaryLabel}>Net</Text>
+              <Text style={[s.summaryAmt, { color: income - expenses >= 0 ? C.success : C.danger }]}>
+                {fmt(income - expenses)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* ── SEARCH + FILTERS ── */}
+      <View style={s.controls}>
+        <View style={s.searchWrap}>
+          <Ionicons name="search" size={16} color={C.textLight} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search transactions…"
+            placeholderTextColor={C.textLight}
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={16} color={C.textLight} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Suppliers</Text>
+          )}
+        </View>
+        <View style={s.filterRow}>
+          {(['ALL', 'INCOME', 'EXPENSE'] as Filter[]).map(f => (
             <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => router.push('/add-supplier' as any)}
+              key={f}
+              style={[s.filterChip, filter === f && s.filterChipActive]}
+              onPress={() => setFilter(f)}
             >
-              <Ionicons name="add" size={24} color="#fff" />
+              <Text style={[s.filterTxt, filter === f && s.filterTxtActive]}>
+                {f === 'ALL' ? 'All' : f === 'INCOME' ? 'Income' : 'Expenses'}
+              </Text>
             </TouchableOpacity>
-          </View>
-
-          {/* Stats Overview */}
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Total Suppliers</Text>
-              <Text style={styles.statValue}>{totalSuppliers}</Text>
-            </View>
-            <View style={styles.verticalDivider} />
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Active</Text>
-              <Text style={styles.statValue}>{activeSuppliers}</Text>
-            </View>
-            <View style={styles.verticalDivider} />
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Outstanding</Text>
-              <Text style={styles.statValue}>{formatCurrency(totalOutstanding)}</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* Floating Search Bar */}
-        <View style={styles.searchContainerWrapper}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#94a3b8" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search supplier name, email..."
-              placeholderTextColor="#94a3b8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={20} color="#94a3b8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+          ))}
         </View>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#122f8a" />
-        }
-      >
-
-        {/* Suppliers List */}
-        <View style={styles.listContainer}>
-          <Text style={styles.sectionTitle}>All Suppliers</Text>
-
-          {isLoading && !refreshing ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#122f8a" />
-            </View>
-          ) : (
-            <>
-              {filteredSuppliers.map((supplier) => (
-                <TouchableOpacity
-                  key={supplier.id}
-                  style={styles.supplierCard}
-                  onPress={() => router.push(`/vendor-profile?id=${supplier.id}&name=${encodeURIComponent(supplier.name)}` as any)}
-                >
-                  {/* Left: Avatar */}
-                  <View style={[styles.avatarContainer, { backgroundColor: '#e0e7ff', overflow: 'hidden' }]}>
-                    {supplier.logoUrl ? (
-                      <Image
-                        source={{ uri: apiService.getImageUrl(supplier.logoUrl) }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <Text style={styles.avatarText}>{getInitials(supplier.name)}</Text>
-                    )}
-                  </View>
-
-                  {/* Middle: Info */}
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardName}>{supplier.name}</Text>
-                    <View style={styles.cardMetaRow}>
-                      <Text style={styles.cardCategory}>{supplier.email || supplier.phone || 'No contact info'}</Text>
-                      <View style={styles.dotSeparator} />
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(supplier.isActive) + '20' }]}>
-                        <Text style={[styles.statusText, { color: getStatusColor(supplier.isActive) }]}>
-                          {supplier.isActive ? 'Active' : 'Inactive'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Right: Balance & Action */}
-                  <View style={styles.cardRight}>
-                    <Text style={styles.cardAmount}>{formatCurrency(Number(supplier.balance) || 0)}</Text>
-                    <TouchableOpacity style={styles.callButton}>
-                      <Ionicons name="chevron-forward" size={18} color="#122f8a" />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
-
-              {filteredSuppliers.length === 0 && (
-                <View style={styles.emptyState}>
-                  <Ionicons name="search-outline" size={48} color="#cbd5e1" />
-                  <Text style={styles.emptyText}>No suppliers found</Text>
-                  <Text style={styles.emptySubtext}>
-                    {suppliers.length === 0 ? "Add your first supplier to get started" : "Try a different search term"}
-                  </Text>
-                  {suppliers.length === 0 && (
-                    <TouchableOpacity
-                      style={[styles.addButton, { width: 'auto', paddingHorizontal: 20, marginTop: 15, borderRadius: 12 }]}
-                      onPress={() => router.push('/add-supplier' as any)}
-                    >
-                      <Text style={{ color: 'white', fontWeight: 'bold' }}>Add Supplier</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </>
+      {/* ── LIST ── */}
+      {loading ? (
+        <View style={s.center}>
+          <ActivityIndicator size="large" color={C.navy} />
+        </View>
+      ) : sections.length === 0 ? (
+        <View style={s.emptyWrap}>
+          <Ionicons name="receipt-outline" size={64} color="#CBD5E1" />
+          <Text style={s.emptyTitle}>No transactions found</Text>
+          <Text style={s.emptySub}>
+            {allTx.length === 0 ? 'Add your first income or expense' : 'Try a different filter'}
+          </Text>
+          {allTx.length === 0 && (
+            <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/add-expense' as any)}>
+              <Ionicons name="add" size={18} color={C.white} />
+              <Text style={s.emptyBtnTxt}>Add Transaction</Text>
+            </TouchableOpacity>
           )}
         </View>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item, i) => String(item.id ?? i)}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.navy} />}
+          renderSectionHeader={({ section }) => (
+            <Text style={s.dateHeader}>{section.title}</Text>
+          )}
+          renderItem={({ item: tx, index, section }) => {
+            const isIncome = tx.type === 'INCOME';
+            const amt = Number(tx.amount);
+            const label = tx.description || tx.category || 'Transaction';
+            const isLast = index === section.data.length - 1;
+            return (
+              <View style={[s.txRow, !isLast && s.txRowBorder]}>
+                <View style={[s.txIcon, { backgroundColor: isIncome ? '#F0FDF4' : '#FEF2F2' }]}>
+                  <Ionicons name={txIcon(tx)} size={20} color={isIncome ? C.success : C.danger} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.txLabel} numberOfLines={1}>{label}</Text>
+                  <Text style={s.txCategory}>{tx.category || tx.paymentMethod || ''}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[s.txAmt, { color: isIncome ? C.success : C.danger }]}>
+                    {isIncome ? '+' : '-'}{fmt(amt)}
+                  </Text>
+                  {tx.user?.name && (
+                    <Text style={s.txMember}>{tx.user.name}</Text>
+                  )}
+                </View>
+              </View>
+            );
+          }}
+          stickySectionHeadersEnabled={false}
+        />
+      )}
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
-    </SafeAreaView>
+      {/* FAB */}
+      <TouchableOpacity style={s.fab} onPress={() => router.push('/add-expense' as any)} activeOpacity={0.85}>
+        <Ionicons name="add" size={28} color={C.white} />
+      </TouchableOpacity>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  headerContainer: {
-    marginBottom: 20,
-    backgroundColor: 'transparent',
-    zIndex: 10,
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
   header: {
-    paddingTop: Platform.OS === 'android' ? 50 : 50,
-    paddingBottom: 50, // More space for search bar
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingHorizontal: 20, paddingBottom: 20,
+    paddingTop: Platform.OS === 'android' ? 50 : 54,
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#fe9900',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  statCard: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  verticalDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  searchContainerWrapper: {
-    marginHorizontal: 20,
-    marginTop: -25, // Overlap the header
-    zIndex: 20,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#64748b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#1e293b',
-    marginLeft: 10,
-  },
-  content: {
-    flex: 1,
-    marginTop: 10,
-  },
-  listContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#334155',
-    marginBottom: 16,
-    marginTop: 10,
-  },
-  supplierCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#64748b',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  avatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#122f8a',
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  cardName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  cardMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardCategory: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  dotSeparator: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#cbd5e1',
-    marginHorizontal: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  cardRight: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  cardAmount: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  callButton: {
-    padding: 6,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748b',
-    marginTop: 12,
-  },
-  emptySubtext: {
-    fontSize: 13,
-    color: '#9ca3af',
-    marginTop: 4,
-  },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerTitle: { color: C.gold, fontSize: 20, fontWeight: '800' },
+  headerSub: { color: 'rgba(255,255,255,0.65)', fontSize: 13, marginTop: 2 },
+  addBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+
+  summaryRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 14, padding: 14, alignItems: 'center' },
+  summaryItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  summaryIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(34,197,94,0.15)', alignItems: 'center', justifyContent: 'center' },
+  summaryLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600', letterSpacing: 0.3 },
+  summaryAmt: { fontSize: 12, fontWeight: '800', color: C.white },
+  divider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.2)', marginHorizontal: 4 },
+
+  controls: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderWidth: 1, borderColor: C.border, marginBottom: 10 },
+  searchInput: { flex: 1, fontSize: 14, color: C.text },
+  filterRow: { flexDirection: 'row', gap: 8 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: C.white, borderWidth: 1, borderColor: C.border },
+  filterChipActive: { backgroundColor: C.navy, borderColor: C.navy },
+  filterTxt: { fontSize: 13, fontWeight: '600', color: C.textLight },
+  filterTxtActive: { color: C.white },
+
+  list: { paddingHorizontal: 16, paddingBottom: 110 },
+  dateHeader: { fontSize: 12, fontWeight: '700', color: C.textLight, letterSpacing: 0.4, marginTop: 16, marginBottom: 6 },
+  txRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, paddingHorizontal: 14, paddingVertical: 13 },
+  txRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
+  txIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  txLabel: { fontSize: 14, fontWeight: '600', color: C.text, marginBottom: 2 },
+  txCategory: { fontSize: 11, color: C.textLight },
+  txAmt: { fontSize: 14, fontWeight: '700' },
+  txMember: { fontSize: 10, color: C.textLight, marginTop: 2 },
+
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text },
+  emptySub: { fontSize: 14, color: C.textLight, textAlign: 'center' },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.navy, borderRadius: 14, paddingHorizontal: 22, paddingVertical: 13, marginTop: 8 },
+  emptyBtnTxt: { color: C.white, fontSize: 15, fontWeight: '700' },
+
+  fab: { position: 'absolute', bottom: 90, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', shadowColor: C.accent, shadowOpacity: 0.4, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 6 },
 });
