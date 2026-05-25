@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import apiService from '@/services/api';
 
 interface FamilyMember {
@@ -40,7 +41,6 @@ export default function AddSavingGoalsScreen() {
     // ── logic from family-dreams.tsx ──
     const [goalName, setGoalName] = useState('');
     const [targetAmount, setTargetAmount] = useState('');
-    const [targetDate, setTargetDate] = useState('');
     const [monthlyContribution, setMonthlyContribution] = useState('');
     const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
     const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
@@ -49,6 +49,8 @@ export default function AddSavingGoalsScreen() {
     // ── new UI state ──
     const [category, setCategory] = useState('car');
     const [showCatModal, setShowCatModal] = useState(false);
+    const [targetDateObj, setTargetDateObj] = useState<Date | undefined>(undefined);
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
     useEffect(() => {
         loadFamilyMembers();
@@ -76,19 +78,13 @@ export default function AddSavingGoalsScreen() {
         );
     };
 
-    const parseTargetDate = (input: string): string | undefined => {
-        if (!input.trim()) return undefined;
-        // Already ISO / parseable
-        const direct = new Date(input);
-        if (!isNaN(direct.getTime())) return direct.toISOString();
-        // "Month YYYY" → "Month 1, YYYY"
-        const parts = input.trim().split(/\s+/);
-        if (parts.length === 2) {
-            const attempt = new Date(`${parts[0]} 1, ${parts[1]}`);
-            if (!isNaN(attempt.getTime())) return attempt.toISOString();
-        }
-        return undefined;
+    const onDateChange = (_: DateTimePickerEvent, selected?: Date) => {
+        setShowDatePicker(Platform.OS === 'ios');
+        if (selected) setTargetDateObj(selected);
     };
+
+    const formatDate = (d: Date) =>
+        d.toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
 
     const handleCreateGoal = async () => {
         if (!goalName.trim()) {
@@ -113,7 +109,7 @@ export default function AddSavingGoalsScreen() {
             await apiService.createGoal({
                 name: goalName.trim(),
                 targetAmount: parsedAmount,
-                targetDate: parseTargetDate(targetDate),
+                targetDate: targetDateObj ? targetDateObj.toISOString() : undefined,
                 monthlyContribution: parseFloat(monthlyContribution) || 0,
                 category,
                 assignedUserId: selectedMembers.length > 0 ? selectedMembers[0] : undefined,
@@ -121,15 +117,16 @@ export default function AddSavingGoalsScreen() {
 
             setGoalName('');
             setTargetAmount('');
-            setTargetDate('');
             setMonthlyContribution('');
             setSelectedMembers([]);
             setCategory('car');
+            setTargetDateObj(undefined);
 
             router.push('/goal-success' as any);
         } catch (e: any) {
-            console.error('createGoal error:', e?.message || e);
-            Alert.alert('Error', e?.message || 'Failed to create goal. Please try again.');
+            const msg = e?.error || e?.message || 'Failed to create goal. Please try again.';
+            console.error('createGoal error:', msg);
+            Alert.alert('Error', msg);
         } finally {
             setLoading(false);
         }
@@ -180,14 +177,26 @@ export default function AddSavingGoalsScreen() {
                     />
 
                     {/* Target Date */}
-                    <Text style={s.label}>Target  Date</Text>
-                    <TextInput
-                        style={s.input}
-                        placeholder="December 2026"
-                        placeholderTextColor="#D1D5DB"
-                        value={targetDate}
-                        onChangeText={setTargetDate}
-                    />
+                    <Text style={s.label}>Target Date</Text>
+                    <TouchableOpacity style={s.input} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+                        <Text style={targetDateObj ? s.dateValueTxt : s.datePlaceholderTxt}>
+                            {targetDateObj ? formatDate(targetDateObj) : 'Select target date (optional)'}
+                        </Text>
+                    </TouchableOpacity>
+                    {showDatePicker && (
+                        <DateTimePicker
+                            value={targetDateObj || new Date()}
+                            mode="date"
+                            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                            onChange={onDateChange}
+                        />
+                    )}
+                    {targetDateObj && (
+                        <TouchableOpacity onPress={() => setTargetDateObj(undefined)} style={s.clearDate}>
+                            <Ionicons name="close-circle" size={16} color={C.sub} />
+                            <Text style={s.clearDateTxt}>Clear date</Text>
+                        </TouchableOpacity>
+                    )}
 
                     {/* Monthly Contribution */}
                     <Text style={s.label}>Monthly  contribution</Text>
@@ -299,6 +308,10 @@ const s = StyleSheet.create({
     memberName: { fontSize: 15, color: C.text },
     createBtn: { backgroundColor: C.navy, borderRadius: 28, paddingVertical: 16, alignItems: 'center', marginTop: 24, marginBottom: 20 },
     createBtnTxt: { color: C.white, fontSize: 17, fontWeight: '700' },
+    dateValueTxt: { fontSize: 15, color: C.text },
+    datePlaceholderTxt: { fontSize: 15, color: '#D1D5DB' },
+    clearDate: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, marginTop: -14, marginBottom: 16 },
+    clearDateTxt: { fontSize: 12, color: C.sub },
     footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
     footerTxt: { fontSize: 12, color: C.sub },
     footerBrand: { fontSize: 12, fontWeight: '700', color: C.navy },

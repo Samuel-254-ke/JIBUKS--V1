@@ -184,7 +184,8 @@ export async function createGoal(req, res, next) {
             select: { role: true, permissions: true }
         });
 
-        const perms = user.permissions || getDefaultPermissions(user.role);
+        const defaults = getDefaultPermissions(user.role);
+        const perms = { ...defaults, ...(user.permissions || {}) };
         if (!perms.canContributeGoals) {
             return res.status(403).json({ error: 'You do not have permission to create goals' });
         }
@@ -228,7 +229,8 @@ export async function getGoals(req, res, next) {
             where: { id: userId },
             select: { role: true, permissions: true }
         });
-        const perms = user.permissions || getDefaultPermissions(user.role);
+        const defaults = getDefaultPermissions(user.role);
+        const perms = { ...defaults, ...(user.permissions || {}) };
 
         if (!perms.canViewGoals) {
             return res.status(403).json({ error: 'You do not have permission to view goals' });
