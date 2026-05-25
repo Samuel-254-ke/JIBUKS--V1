@@ -191,13 +191,19 @@ export async function createGoal(req, res, next) {
 
         if (!name || !targetAmount) return res.status(400).json({ error: 'Name and target amount are required' });
 
+        let parsedDate = null;
+        if (targetDate) {
+            const d = new Date(targetDate);
+            parsedDate = isNaN(d.getTime()) ? null : d;
+        }
+
         const goal = await prisma.goal.create({
             data: {
                 tenantId,
                 name,
                 category: category || null,
-                targetAmount,
-                targetDate: targetDate ? new Date(targetDate) : null,
+                targetAmount: parseFloat(targetAmount),
+                targetDate: parsedDate,
                 monthlyContribution: monthlyContribution ? parseFloat(monthlyContribution) : null,
                 assignedUserId: assignedUserId ? parseInt(assignedUserId) : null,
             }

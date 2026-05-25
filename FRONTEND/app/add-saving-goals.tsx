@@ -76,21 +76,44 @@ export default function AddSavingGoalsScreen() {
         );
     };
 
+    const parseTargetDate = (input: string): string | undefined => {
+        if (!input.trim()) return undefined;
+        // Already ISO / parseable
+        const direct = new Date(input);
+        if (!isNaN(direct.getTime())) return direct.toISOString();
+        // "Month YYYY" → "Month 1, YYYY"
+        const parts = input.trim().split(/\s+/);
+        if (parts.length === 2) {
+            const attempt = new Date(`${parts[0]} 1, ${parts[1]}`);
+            if (!isNaN(attempt.getTime())) return attempt.toISOString();
+        }
+        return undefined;
+    };
+
     const handleCreateGoal = async () => {
         if (!goalName.trim()) {
             Alert.alert('Missing Info', 'Please enter a goal name.');
+            return;
+        }
+        if (!targetAmount.trim()) {
+            Alert.alert('Missing Info', 'Please enter a target amount.');
             return;
         }
         if (!monthlyContribution.trim()) {
             Alert.alert('Missing Info', 'Please enter a monthly contribution amount.');
             return;
         }
+        const parsedAmount = parseFloat(targetAmount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            Alert.alert('Invalid Amount', 'Please enter a valid target amount.');
+            return;
+        }
         try {
             setLoading(true);
             await apiService.createGoal({
-                name: goalName,
-                targetAmount: parseFloat(targetAmount) || 0,
-                targetDate: targetDate || undefined,
+                name: goalName.trim(),
+                targetAmount: parsedAmount,
+                targetDate: parseTargetDate(targetDate),
                 monthlyContribution: parseFloat(monthlyContribution) || 0,
                 category,
                 assignedUserId: selectedMembers.length > 0 ? selectedMembers[0] : undefined,
@@ -104,9 +127,9 @@ export default function AddSavingGoalsScreen() {
             setCategory('car');
 
             router.push('/goal-success' as any);
-        } catch (e) {
-            console.error(e);
-            Alert.alert('Error', 'Failed to create goal. Please try again.');
+        } catch (e: any) {
+            console.error('createGoal error:', e?.message || e);
+            Alert.alert('Error', e?.message || 'Failed to create goal. Please try again.');
         } finally {
             setLoading(false);
         }
