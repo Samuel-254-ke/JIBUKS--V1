@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiService from '@/services/api';
+import FABMenu from '@/components/FABMenu';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -237,10 +238,7 @@ export default function ActivityScreen() {
         />
       )}
 
-      {/* FAB */}
-      <TouchableOpacity style={s.fab} onPress={() => router.push('/add-expense' as any)} activeOpacity={0.85}>
-        <Ionicons name="add" size={28} color={C.white} />
-      </TouchableOpacity>
+      <FABMenu />
     </View>
   );
 }
@@ -290,5 +288,4 @@ const s = StyleSheet.create({
   emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.navy, borderRadius: 14, paddingHorizontal: 22, paddingVertical: 13, marginTop: 8 },
   emptyBtnTxt: { color: C.white, fontSize: 15, fontWeight: '700' },
 
-  fab: { position: 'absolute', bottom: 90, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', shadowColor: C.accent, shadowOpacity: 0.4, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 6 },
 });
