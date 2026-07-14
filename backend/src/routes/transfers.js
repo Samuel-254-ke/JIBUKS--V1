@@ -174,8 +174,6 @@ router.post('/', async (req, res) => {
             }
         });
 
-        console.log(`[Transfers] Created transfer ${transfer.id} from ${fromAccount.name} to ${toAccount.name}`);
-
         res.status(201).json({
             ...transfer,
             amount: Number(transfer.amount),

@@ -16,6 +16,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiService from '@/services/api';
 import FABMenu from '@/components/FABMenu';
+import Toast from 'react-native-toast-message';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -67,6 +68,7 @@ export default function ActivityScreen() {
     } catch (e) {
       console.error('Failed to load transactions:', e);
       setAllTx([]);
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load transactions' });
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,10 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required but not set.');
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Middleware to verify JWT token from Authorization header
@@ -17,6 +21,9 @@ function verifyJWT(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.type !== 'access') {
+      return res.status(401).json({ error: 'Invalid token type' });
+    }
     req.user = decoded; // Attach user to request
     next();
   } catch (err) {
@@ -38,6 +45,9 @@ function verifyAdminJWT(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.type !== 'access') {
+      return res.status(401).json({ error: 'Invalid token type' });
+    }
     if (!decoded.isAdmin) {
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
     }
@@ -46,6 +56,19 @@ function verifyAdminJWT(req, res, next) {
   } catch (err) {
     res.status(401).json({ error: 'Invalid or expired admin token' });
   }
+}
+
+/**
+ * Middleware to reject requests whose authenticated user has no tenantId.
+ * Defense in depth: without this, a Prisma `where: { tenantId }` with
+ * tenantId === undefined silently drops the filter and can return
+ * cross-tenant data. Use after verifyJWT.
+ */
+function requireTenant(req, res, next) {
+  if (!req.user?.tenantId) {
+    return res.status(400).json({ error: 'tenantId is required' });
+  }
+  next();
 }
 
 /**
@@ -59,6 +82,7 @@ function generateToken(user) {
       tenantId: user.tenantId,
       role: user.role,
       auth0Id: user.auth0Id,
+      type: 'access',
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -70,7 +94,7 @@ function generateToken(user) {
  */
 function generateRefreshToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email },
+    { id: user.id, email: user.email, type: 'refresh' },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -85,6 +109,7 @@ function generateAdminToken(admin) {
       id: admin.id,
       email: admin.email,
       isAdmin: true,
+      type: 'access',
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -96,7 +121,7 @@ function generateAdminToken(admin) {
  */
 function generateAdminRefreshToken(admin) {
   return jwt.sign(
-    { id: admin.id, email: admin.email, isAdmin: true },
+    { id: admin.id, email: admin.email, isAdmin: true, type: 'refresh' },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -106,6 +131,7 @@ function generateAdminRefreshToken(admin) {
 export {
   verifyJWT,
   verifyAdminJWT,
+  requireTenant,
   generateToken,
   generateRefreshToken,
   generateAdminToken,

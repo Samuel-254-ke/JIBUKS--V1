@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import apiService from '@/services/api';
 import FABMenu from '@/components/FABMenu';
+import Toast from 'react-native-toast-message';
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 const C = {
@@ -177,7 +178,11 @@ export default function HomeScreen() {
       const res = await apiService.getDashboard();
       setDashData(res);
     } catch {
-      // falls back to mock data below
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load dashboard data',
+      });
     } finally {
       setLoading(false);
     }

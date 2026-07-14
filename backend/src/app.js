@@ -77,8 +77,7 @@ app.use(helmet());
 app.use(cors({
   origin: (origin, callback) => {
     const allowedOrigins = buildCorsOrigins();
-    console.log('🌐 CORS check - Origin:', origin, 'Allowed:', allowedOrigins.includes(origin));
-    
+
     // Allow requests with no origin (mobile apps) or allowed origins
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
@@ -101,18 +100,6 @@ app.use(morgan('combined'));
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-// Request logging for debugging
-app.use((req, res, next) => {
-  console.log('📥 Request:', {
-    method: req.method,
-    url: req.url,
-    origin: req.headers.origin,
-    userAgent: req.headers['user-agent'],
-    timestamp: new Date().toISOString()
-  });
-  next();
-});
 
 // Health check
 app.get('/health', (req, res) => {
@@ -177,8 +164,13 @@ app.use('*', (req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal Server Error',
+  const status = err.status || 500;
+  // Only trust err.message for deliberately-thrown, client-facing errors
+  // (those that set err.status). Unexpected errors (e.g. raw Prisma/db
+  // errors) could otherwise leak internal details to the client.
+  const message = err.status ? err.message : 'Internal Server Error';
+  res.status(status).json({
+    error: message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });

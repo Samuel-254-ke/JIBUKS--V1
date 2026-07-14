@@ -1,11 +1,12 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
-import { verifyJWT } from '../middleware/auth.js';
+import { verifyJWT, requireTenant } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Apply JWT verification to all routes
 router.use(verifyJWT);
+router.use(requireTenant);
 
 // ============================================
 // GET ALL CUSTOMERS

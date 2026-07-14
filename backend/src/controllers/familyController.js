@@ -47,8 +47,6 @@ export async function updateFamily(req, res, next) {
         const { tenantId, role } = req.user;
         const { name, metadata } = req.body;
 
-        console.log('Update family - User role:', role, 'Tenant:', tenantId);
-
         // Allow if user has a tenant (is part of a family)
         if (!tenantId) {
             return res.status(403).json({ error: 'Not part of any family' });
@@ -85,9 +83,6 @@ export async function createMember(req, res, next) {
         const { tenantId, role: creatorRole } = req.user;
         const { name, email, password, role, age } = req.body;
 
-        console.log('Create member - Creator role:', creatorRole, 'Tenant:', tenantId);
-        console.log('Member data:', { name, email, role });
-
         // Allow if user has a tenant (is part of a family)
         if (!tenantId) {
             return res.status(403).json({ error: 'Not part of any family' });
@@ -122,9 +117,6 @@ export async function createMember(req, res, next) {
             const protocol = req.protocol;
             const host = req.get('host');
             avatarUrl = `/uploads/${req.file.filename}`;
-            console.log('Image uploaded successfully:', avatarUrl);
-        } else {
-            console.log('No image uploaded');
         }
 
         const newUser = await prisma.user.create({
@@ -154,9 +146,7 @@ export async function createMember(req, res, next) {
 
         // Send invitation email
         try {
-            console.log('Sending invitation email to:', email);
-            const emailSent = await sendInvitationEmail(email, password, req.user.name || 'A family member', family.name);
-            console.log('Email sent successfully:', emailSent);
+            await sendInvitationEmail(email, password, req.user.name || 'A family member', family.name);
         } catch (emailErr) {
             console.error('Failed to send invitation email:', emailErr);
             // Don't fail the request if email fails

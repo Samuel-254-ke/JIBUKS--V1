@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import apiService from '@/services/api';
+import Toast from 'react-native-toast-message';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +41,7 @@ export default function IncomeScreen() {
       setStats(statsData);
     } catch (error) {
       console.error('Error loading incomes:', error);
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load income data' });
     } finally {
       setLoading(false);
     }
