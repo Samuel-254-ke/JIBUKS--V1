@@ -10,7 +10,7 @@
 
 **A comprehensive mobile application for managing family finances and business accounting**
 
-[Features](#features) • [Installation](#installation) • [Usage](#usage) • [API Documentation](#api-documentation)
+[Features](#features) • [Installation](#installation) • [Full docs](./docs/README.md) • [API reference](./docs/02-BACKEND_API.md)
 
 </div>
 
@@ -26,9 +26,10 @@
 - [Installation](#installation)
 - [Running Locally](#running-locally)
 - [Database Setup](#database-setup)
-- [API Endpoints](#api-endpoints)
+- [API Endpoints](#api-endpoints) → full catalogue in [`docs/`](./docs/README.md)
 - [Environment Variables](#environment-variables)
 - [Troubleshooting](#troubleshooting)
+- [System documentation](./docs/README.md)
 - [Contributing](#contributing)
 
 ---
@@ -43,7 +44,7 @@
 - 📊 **Analytics Dashboard**: Real-time insights into spending patterns and financial health
 - 🎯 **Goal Tracking**: Set and monitor financial goals with progress visualization
 - 👥 **Multi-User Support**: Family members with role-based permissions
-- 🔒 **Secure Authentication**: JWT-based auth with OAuth2 support
+- 🔒 **Secure Authentication**: JWT-based auth (access + refresh tokens)
 
 ---
 
@@ -353,75 +354,26 @@ npx expo start --web
 
 ## 🔌 API Endpoints
 
-### Authentication
+The partial list that used to live here is **outdated**. The complete, maintained API catalogue (150+ endpoints) is in:
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/api/auth/signup` | Create new user account | No |
-| POST | `/api/auth/login` | Login with email/password | No |
-| POST | `/api/auth/logout` | Logout user | Yes |
-| GET | `/api/auth/me` | Get current user | Yes |
-| POST | `/api/auth/refresh-token` | Refresh access token | No |
+**→ [`docs/02-BACKEND_API.md`](./docs/02-BACKEND_API.md)**
 
-### Dashboard
+Quick entry points:
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/dashboard` | Get dashboard statistics | Yes |
-| GET | `/api/dashboard/analytics` | Get analytics data | Yes |
+| Area | Base path | Auth |
+|------|-----------|------|
+| Auth | `/api/auth` | Public / JWT |
+| Family | `/api/family` | User JWT |
+| Transactions | `/api/transactions` | User JWT |
+| Chart of accounts | `/api/accounts` | User JWT |
+| Reports | `/api/reports` | User JWT |
+| Customers / Invoices | `/api/customers`, `/api/invoices` | User JWT |
+| Vendors / Purchases | `/api/vendors`, `/api/purchases` | User JWT |
+| Inventory | `/api/inventory` | User JWT |
+| Bank / Cheques | `/api/bank`, `/api/cheques` | JWT / tenant query |
+| Admin | `/api/admin/*`, `/api/tasks` | Admin JWT |
 
-### Transactions
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/transactions` | List all transactions | Yes |
-| POST | `/api/transactions` | Create new transaction | Yes |
-| GET | `/api/transactions/:id` | Get transaction by ID | Yes |
-| PUT | `/api/transactions/:id` | Update transaction | Yes |
-| DELETE | `/api/transactions/:id` | Delete transaction | Yes |
-
-### Categories
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/categories` | List all categories | Yes |
-| POST | `/api/categories` | Create new category | Yes |
-| PUT | `/api/categories/:id` | Update category | Yes |
-| DELETE | `/api/categories/:id` | Delete category | Yes |
-
-### Payment Methods
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/payment-methods` | List payment methods | Yes |
-| POST | `/api/payment-methods` | Create payment method | Yes |
-
-### Budgets
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/budgets` | List all budgets | Yes |
-| POST | `/api/budgets` | Create new budget | Yes |
-| PUT | `/api/budgets/:id` | Update budget | Yes |
-| DELETE | `/api/budgets/:id` | Delete budget | Yes |
-
-### Goals
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/goals` | List all goals | Yes |
-| POST | `/api/goals` | Create new goal | Yes |
-| PUT | `/api/goals/:id` | Update goal | Yes |
-| DELETE | `/api/goals/:id` | Delete goal | Yes |
-
-### Users & Family
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/users` | List family members | Yes |
-| POST | `/api/users` | Add family member | Yes |
-| PUT | `/api/users/:id` | Update user | Yes |
-| DELETE | `/api/users/:id` | Remove family member | Yes |
+Register is `POST /api/auth/register` (not `/signup`). Full request/response notes, admin OpenAPI, and Postman links are in the docs folder.
 
 ---
 
@@ -592,12 +544,23 @@ npm install
 
 ---
 
-## 📚 Additional Documentation
+## 📚 System Documentation (canonical)
 
-- **[QUICK_START.md](QUICK_START.md)**: Quick setup guide
-- **[FRONTEND_COMPLETE.md](FRONTEND_COMPLETE.md)**: Frontend implementation details
-- **[backend/README.md](backend/README.md)**: Backend API documentation
-- **[FRONTEND/docs/](FRONTEND/docs/)**: Feature-specific guides
+| Doc | Description |
+|-----|-------------|
+| **[docs/README.md](./docs/README.md)** | Documentation index |
+| **[docs/01-SYSTEM_OVERVIEW.md](./docs/01-SYSTEM_OVERVIEW.md)** | Architecture, domain, security |
+| **[docs/02-BACKEND_API.md](./docs/02-BACKEND_API.md)** | Every mounted HTTP endpoint |
+| **[docs/03-FRONTEND.md](./docs/03-FRONTEND.md)** | Expo routes, auth, `api.ts` client |
+| **[docs/04-DATABASE.md](./docs/04-DATABASE.md)** | Prisma models & relationships |
+| **[docs/05-SETUP_AND_DEPLOYMENT.md](./docs/05-SETUP_AND_DEPLOYMENT.md)** | Local, Docker, env vars |
+
+Also useful:
+
+- **[backend/README.md](backend/README.md)** — backend package notes
+- **[FRONTEND/docs/](FRONTEND/docs/)** — feature-specific guides (income, dashboard, family settings)
+- **[backend/docs/admin-dashboard.openapi.yaml](backend/docs/admin-dashboard.openapi.yaml)** — Super Admin OpenAPI
+- **[docs/cheque_integration_summary.md](./docs/cheque_integration_summary.md)** — cheque payment flow notes
 
 ---
 
