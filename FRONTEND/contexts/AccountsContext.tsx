@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import apiService, { Account } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AccountsContextValue {
   accounts: Account[];
@@ -12,23 +13,15 @@ interface AccountsContextValue {
 const AccountsContext = createContext<AccountsContextValue | undefined>(undefined);
 
 export const AccountsProvider = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated, isInitializing, user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadAccounts = async () => {
+  const loadAccounts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Check if user is authenticated before loading accounts
-      const token = await require('@react-native-async-storage/async-storage').default.getItem('authToken');
-      if (!token) {
-        console.log('⚠️ No auth token found, skipping account load');
-        setAccounts([]);
-        setLoading(false);
-        return;
-      }
 
       console.log('🔄 Loading accounts from database...');
 
@@ -51,11 +44,23 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadAccounts();
   }, []);
+
+  // Refetch when auth is ready / user changes; clear on logout
+  useEffect(() => {
+    if (isInitializing) {
+      return;
+    }
+
+    if (!isAuthenticated || !user) {
+      setAccounts([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    void loadAccounts();
+  }, [isAuthenticated, isInitializing, user?.id, user?.tenantId, loadAccounts]);
 
   const value = useMemo<AccountsContextValue>(
     () => ({
@@ -65,7 +70,7 @@ export const AccountsProvider = ({ children }: { children: ReactNode }) => {
       error,
       refreshAccounts: loadAccounts,
     }),
-    [accounts, loading, error]
+    [accounts, loading, error, loadAccounts]
   );
 
   return <AccountsContext.Provider value={value}>{children}</AccountsContext.Provider>;

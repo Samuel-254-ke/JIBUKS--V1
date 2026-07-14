@@ -2,14 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-// Get environment variables
+// Get environment variables (.env / process.env wins over app.json extras for local dev)
 const getEnvVar = (key: string, defaultValue: string = ''): string => {
   // @ts-ignore - Expo injects these at build time
-  const value = Constants.expoConfig?.extra?.[key] || 
-                Constants.expoConfig?.extra?.eas?.[key] || 
-                process.env[key] || 
+  const value = process.env[key] ||
+                Constants.expoConfig?.extra?.[key] ||
+                Constants.expoConfig?.extra?.eas?.[key] ||
                 defaultValue;
-  
+
   console.log(`🔧 Environment variable ${key}:`, value);
   return value;
 };

@@ -17,7 +17,7 @@ type AccountType = 'ASSET' | 'LIABILITY' | 'INCOME' | 'EXPENSE' | 'EQUITY';
 
 export default function AccountsScreen() {
   const router = useRouter();
-  const { accounts, loading } = useAccounts();
+  const { accounts, loading, error, refreshAccounts } = useAccounts();
   const [expandedSections, setExpandedSections] = useState<Set<AccountType>>(
     new Set(['ASSET', 'INCOME', 'EXPENSE'])
   );
@@ -114,6 +114,28 @@ export default function AccountsScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {error ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="warning-outline" size={40} color="#ef4444" />
+            <Text style={styles.emptyTitle}>Couldn’t load accounts</Text>
+            <Text style={styles.emptyText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => void refreshAccounts()}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : accounts.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="wallet-outline" size={40} color="#94a3b8" />
+            <Text style={styles.emptyTitle}>No accounts yet</Text>
+            <Text style={styles.emptyText}>
+              Your chart of accounts will appear here after signup seeding completes.
+            </Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => void refreshAccounts()}>
+              <Text style={styles.retryButtonText}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Account Type Sections */}
         {accountTypeOrder.map((type) => {
           const typeAccounts = accountsByType[type] || [];
@@ -338,5 +360,34 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     color: '#2563eb',
+  },
+  emptyState: {
+    marginTop: 48,
+    marginHorizontal: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 8,
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
