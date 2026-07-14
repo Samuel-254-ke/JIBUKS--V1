@@ -163,7 +163,7 @@ export default function FinancialSetupScreen() {
                 </View>
 
                 <Text style={styles.footerInstruction}>
-                    We'll customize everything based on your industry with the right accounts \u0026 features.
+                    We'll customize everything based on your industry with the right accounts & features.
                 </Text>
 
                 <TouchableOpacity

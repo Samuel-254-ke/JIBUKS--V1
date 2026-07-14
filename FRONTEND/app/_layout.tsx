@@ -129,6 +129,29 @@ function AppNavigator() {
         <Stack.Screen name="add-income" options={{ headerShown: false }} />
         <Stack.Screen name="expenses" options={{ headerShown: false }} />
         <Stack.Screen name="add-expense" options={{ headerShown: false }} />
+        <Stack.Screen name="reports" options={{ headerShown: false }} />
+        <Stack.Screen name="customers" options={{ headerShown: false }} />
+        <Stack.Screen name="invoices" options={{ headerShown: false }} />
+        <Stack.Screen name="create-invoice" options={{ headerShown: false }} />
+        <Stack.Screen name="credit-memo" options={{ headerShown: false }} />
+        <Stack.Screen name="receipt" options={{ headerShown: false }} />
+        <Stack.Screen name="vendor-profile" options={{ headerShown: false }} />
+        <Stack.Screen name="supplier-bill" options={{ headerShown: false }} />
+        <Stack.Screen name="pay-supplier" options={{ headerShown: false }} />
+        <Stack.Screen name="banking" options={{ headerShown: false }} />
+        <Stack.Screen name="deposit-cheque" options={{ headerShown: false }} />
+        <Stack.Screen name="cheque-details" options={{ headerShown: false }} />
+        <Stack.Screen name="pending-cheques" options={{ headerShown: false }} />
+        <Stack.Screen name="new-purchase" options={{ headerShown: false }} />
+        <Stack.Screen name="inventory-detail" options={{ headerShown: false }} />
+        <Stack.Screen name="inventory-valuation" options={{ headerShown: false }} />
+        <Stack.Screen name="item-history" options={{ headerShown: false }} />
+        <Stack.Screen name="cogs-report" options={{ headerShown: false }} />
+        <Stack.Screen name="stock-adjustment" options={{ headerShown: false }} />
+        <Stack.Screen name="add-loan" options={{ headerShown: false }} />
+        <Stack.Screen name="repay-loan" options={{ headerShown: false }} />
+        <Stack.Screen name="add-to-goal" options={{ headerShown: false }} />
+        <Stack.Screen name="household-assets" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>

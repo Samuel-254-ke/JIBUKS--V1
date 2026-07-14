@@ -863,6 +863,33 @@ class ApiService {
     return this.request('/dashboard/business');
   }
 
+  async getBusinessOnboardingStatus(): Promise<{
+    hasName: boolean;
+    hasIndustry: boolean;
+    hasSalesType: boolean;
+    isCompleted: boolean;
+  }> {
+    return this.request('/business/onboarding-status');
+  }
+
+  async completeBusinessOnboarding(data: {
+    businessName?: string;
+    industry?: string;
+    salesType?: string;
+    address?: string;
+    phoneNumber?: string;
+    email?: string;
+    currency?: string;
+    yearStart?: string;
+    vatChoice?: string;
+    styleChoice?: string;
+  }): Promise<any> {
+    return this.request('/business/onboarding', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getMemberDetails(memberId: string): Promise<any> {
     return this.request(`/family/members/${memberId}`);
   }

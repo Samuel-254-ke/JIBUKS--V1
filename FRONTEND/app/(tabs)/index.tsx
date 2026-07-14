@@ -164,13 +164,15 @@ function ActivityRow({ tx }: { tx: any }) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [dashData, setDashData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(useCallback(() => {
-    loadDashboard();
-  }, [user?.tenantId]));
+    if (isAuthenticated) {
+      loadDashboard();
+    }
+  }, [user?.tenantId, isAuthenticated]));
 
   const loadDashboard = async () => {
     try {

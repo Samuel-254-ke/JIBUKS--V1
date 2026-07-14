@@ -335,6 +335,13 @@ export const FAMILY_COA_TEMPLATE = [
     { code: '2131', name: 'Rental Income Tax Payable', type: 'LIABILITY', description: 'Tax on rental income (10%)', isSystem: false, isContra: false, subtype: 'taxes_payable', parentCode: '2100' },
 
     // ----------------------------------------
+    // UNCLEARED CHEQUES (2150)
+    // Required by the cheque management feature (routes/cheques.js) to
+    // track post-dated cheques written but not yet cleared by the bank.
+    // ----------------------------------------
+    { code: '2150', name: 'Uncleared Cheques Payable', type: 'LIABILITY', description: 'Tracks post-dated cheques that have been written but not yet cleared by the bank', isSystem: true, isContra: false, subtype: 'current_liability', systemTag: 'UNCLEARED_CHEQUES' },
+
+    // ----------------------------------------
     // PAYROLL LIABILITIES (2200-2299)
     // Employee-related payables
     // ----------------------------------------
@@ -813,42 +820,42 @@ export const CATEGORY_ACCOUNT_MAP = {
     'Salary': { incomeAccount: '4000', defaultAssetAccount: '1020' },  // Equity Bank
     'Business': { incomeAccount: '4010', defaultAssetAccount: '1010' }, // M-PESA
     'Investment': { incomeAccount: '4020', defaultAssetAccount: '1020' }, // Equity Bank
-    'Gift': { incomeAccount: '4030', defaultAssetAccount: '1001' }, // Cash
+    'Gift': { incomeAccount: '4030', defaultAssetAccount: '1000' }, // Cash
     'Rental': { incomeAccount: '4040', defaultAssetAccount: '1020' }, // Equity Bank
-    'Other Income': { incomeAccount: '4050', defaultAssetAccount: '1001' }, // Cash
+    'Other Income': { incomeAccount: '4050', defaultAssetAccount: '1000' }, // Cash
 
     // Sales Revenue
     'Product Sales': { incomeAccount: '4100', defaultAssetAccount: '1010' }, // M-PESA
     'Service Sales': { incomeAccount: '4110', defaultAssetAccount: '1010' }, // M-PESA
 
     // Expense Categories (Aligned to new 6000 series)
-    'Food': { expenseAccount: '6100', defaultAssetAccount: '1001' }, // Cash
-    'Groceries': { expenseAccount: '6110', defaultAssetAccount: '1001' }, // Cash
-    'Transport': { expenseAccount: '6200', defaultAssetAccount: '1001' }, // Cash
+    'Food': { expenseAccount: '6100', defaultAssetAccount: '1000' }, // Cash
+    'Groceries': { expenseAccount: '6110', defaultAssetAccount: '1000' }, // Cash
+    'Transport': { expenseAccount: '6200', defaultAssetAccount: '1000' }, // Cash
     'Housing': { expenseAccount: '6000', defaultAssetAccount: '1020' }, // Equity Bank
     'Rent': { expenseAccount: '6010', defaultAssetAccount: '1020' }, // Equity Bank
     'Utilities': { expenseAccount: '6000', defaultAssetAccount: '1010' }, // M-PESA
-    'Healthcare': { expenseAccount: '6300', defaultAssetAccount: '1001' }, // Cash
+    'Healthcare': { expenseAccount: '6300', defaultAssetAccount: '1000' }, // Cash
     'Education': { expenseAccount: '6400', defaultAssetAccount: '1020' }, // Equity Bank
-    'Entertainment': { expenseAccount: '6500', defaultAssetAccount: '1001' }, // Cash
-    'Shopping': { expenseAccount: '6140', defaultAssetAccount: '1001' }, // Cash
+    'Entertainment': { expenseAccount: '6500', defaultAssetAccount: '1000' }, // Cash
+    'Shopping': { expenseAccount: '6140', defaultAssetAccount: '1000' }, // Cash
     'Communication': { expenseAccount: '6060', defaultAssetAccount: '1010' }, // M-PESA
     'Insurance': { expenseAccount: '6310', defaultAssetAccount: '1020' }, // Equity Bank
-    'Donations': { expenseAccount: '5199', defaultAssetAccount: '1001' }, // Cash
-    'Other Expenses': { expenseAccount: '5199', defaultAssetAccount: '1001' }, // Cash
+    'Donations': { expenseAccount: '5199', defaultAssetAccount: '1000' }, // Cash
+    'Other Expenses': { expenseAccount: '5199', defaultAssetAccount: '1000' }, // Cash
 
     // Business Expense Categories
-    'COGS': { expenseAccount: '5200', defaultAssetAccount: '1300' },
-    'Bank Charges': { expenseAccount: '6610', defaultAssetAccount: '1020' }, // Equity Bank
-    'Interest Expense': { expenseAccount: '6620', defaultAssetAccount: '1020' }, // Equity Bank
-    'Depreciation': { expenseAccount: '5300', defaultAssetAccount: '1590' },
+    'COGS': { expenseAccount: '5000', defaultAssetAccount: '1300' },
+    'Bank Charges': { expenseAccount: '6501', defaultAssetAccount: '1020' }, // Equity Bank
+    'Interest Expense': { expenseAccount: '6506', defaultAssetAccount: '1020' }, // Equity Bank
+    'Depreciation': { expenseAccount: '6900', defaultAssetAccount: '1300' },
     'Salaries': { expenseAccount: '5400', defaultAssetAccount: '1020' }, // Equity Bank
 
     // Additional Standard Categories
     'Subscriptions': { expenseAccount: '6510', defaultAssetAccount: '1010' }, // M-PESA
-    'Personal Care': { expenseAccount: '6130', defaultAssetAccount: '1001' }, // Cash
-    'Pet Care': { expenseAccount: '6450', defaultAssetAccount: '1001' }, // Cash
-    'Childcare': { expenseAccount: '6430', defaultAssetAccount: '1001' }, // Cash
+    'Personal Care': { expenseAccount: '6130', defaultAssetAccount: '1000' }, // Cash
+    'Pet Care': { expenseAccount: '6450', defaultAssetAccount: '1000' }, // Cash
+    'Childcare': { expenseAccount: '6430', defaultAssetAccount: '1000' }, // Cash
     'Gym': { expenseAccount: '6340', defaultAssetAccount: '1010' }, // M-PESA
     'Fitness': { expenseAccount: '6340', defaultAssetAccount: '1010' }, // M-PESA
 };
@@ -935,6 +942,7 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
                     description: acc.description,
                     subtype: acc.subtype,
                     detailType: acc.detailType,
+                    systemTag: acc.systemTag || null,
                 },
                 create: {
                     tenantId,
@@ -949,6 +957,7 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
                     isPaymentEligible: acc.isPaymentEligible || false,
                     isActive: true,
                     currency,
+                    systemTag: acc.systemTag || null,
                 }
             });
         }
