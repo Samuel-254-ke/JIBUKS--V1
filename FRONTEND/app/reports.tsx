@@ -385,6 +385,33 @@ function TopTab({ data }: { data: typeof CATEGORIES }) {
     );
 }
 
+// Visual palette cycled by index for real (backend) categories, which only
+// carry a name/amount/percentage — icon/color are presentation-only and
+// don't come from the API.
+const CATEGORY_PALETTE = [
+    { icon: 'restaurant',  iconBg: '#FFF7ED', iconColor: '#F97316', color: '#EF4444', badgeBg: '#FEF3C7', badgeColor: '#92400E' },
+    { icon: 'car',         iconBg: '#EFF6FF', iconColor: '#3B82F6', color: '#1a3a8f', badgeBg: '#DBEAFE', badgeColor: '#1E40AF' },
+    { icon: 'receipt',     iconBg: '#F0FDF4', iconColor: '#22C55E', color: '#22C55E', badgeBg: '#DCFCE7', badgeColor: '#166534' },
+    { icon: 'fitness',     iconBg: '#FEF2F2', iconColor: '#EF4444', color: '#F59E0B', badgeBg: '#FEE2E2', badgeColor: '#991B1B' },
+    { icon: 'pricetag',    iconBg: '#F5F3FF', iconColor: '#8B5CF6', color: '#8B5CF6', badgeBg: '#EDE9FE', badgeColor: '#5B21B6' },
+    { icon: 'briefcase',   iconBg: '#ECFEFF', iconColor: '#06B6D4', color: '#06B6D4', badgeBg: '#CFFAFE', badgeColor: '#155E75' },
+];
+
+// Backend returns { category, code, amount, transactionCount, percentage } —
+// map that onto the display shape the tab components expect.
+function toDisplayCategories(apiCategories: any[]) {
+    return apiCategories.map((c, i) => {
+        const palette = CATEGORY_PALETTE[i % CATEGORY_PALETTE.length];
+        return {
+            label: c.category ?? c.label ?? 'Uncategorized',
+            amount: Number(c.amount) || 0,
+            transactions: c.transactionCount ?? c.transactions ?? 0,
+            pct: Number(c.percentage ?? c.pct) || 0,
+            ...palette,
+        };
+    });
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────────
 export default function ReportsScreen() {
     const router = useRouter();
@@ -397,7 +424,7 @@ export default function ReportsScreen() {
     const load = async () => {
         try {
             const analysis = await apiService.getCategoryAnalysis();
-            if (analysis?.categories?.length) setCategoryData(analysis.categories);
+            if (analysis?.categories?.length) setCategoryData(toDisplayCategories(analysis.categories));
         } catch { /* use mock */ }
         finally { setLoading(false); }
     };

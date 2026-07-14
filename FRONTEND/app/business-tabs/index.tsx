@@ -2,12 +2,17 @@ import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiService from '@/services/api';
 
 const ONBOARDING_KEY = 'businessOnboardingComplete';
 
 /**
  * Entry point for business: new users go to onboarding first,
  * returning users (who completed setup) go to dashboard.
+ *
+ * Onboarding status is tracked server-side (Tenant.metadata.onboardingCompleted)
+ * so it's consistent across devices/reinstalls; AsyncStorage is only a fast
+ * local cache to skip the round-trip on the common case.
  */
 export default function BusinessTabsIndex() {
     const router = useRouter();
@@ -17,10 +22,17 @@ export default function BusinessTabsIndex() {
 
         async function decideRoute() {
             try {
-                const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
+                const cached = await AsyncStorage.getItem(ONBOARDING_KEY);
+                if (cached === 'true') {
+                    if (mounted) router.replace('/business-tabs/business-dashboard');
+                    return;
+                }
+
+                const status = await apiService.getBusinessOnboardingStatus();
                 if (!mounted) return;
-                // Only go to dashboard if onboarding was explicitly completed; otherwise setup first
-                if (completed === 'true') {
+
+                if (status.isCompleted) {
+                    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
                     router.replace('/business-tabs/business-dashboard');
                 } else {
                     router.replace('/business-tabs/business-onboarding');

@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiService from '@/services/api';
+import Toast from 'react-native-toast-message';
 
 const ONBOARDING_KEY = 'businessOnboardingComplete';
 const { width } = Dimensions.get('window');
@@ -20,7 +22,29 @@ export default function BusinessOnboardingSuccessScreen() {
     const template = params.styleChoice === 'simple' ? 'Simple Style' : 'Detailed Style';
 
     const handleStart = async () => {
-        await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+        try {
+            await apiService.completeBusinessOnboarding({
+                businessName: params.businessName as string,
+                industry: params.industry as string,
+                salesType: params.salesType as string,
+                address: params.address as string,
+                phoneNumber: params.phoneNumber as string,
+                email: params.email as string,
+                currency: params.currency as string,
+                yearStart: params.yearStart as string,
+                vatChoice: params.vatChoice as string,
+                styleChoice: params.styleChoice as string,
+            });
+            await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+        } catch (error) {
+            console.error('Failed to save onboarding data:', error);
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'Failed to save business setup. Please try again.',
+            });
+            return;
+        }
         router.replace({
             pathname: '/business-tabs/business-dashboard',
             params: {

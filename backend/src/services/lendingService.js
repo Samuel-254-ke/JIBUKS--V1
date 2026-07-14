@@ -130,19 +130,12 @@ export async function writeOffLoan(tenantId, userId, loanId) {
     const loan = await prisma.loan.findFirst({ where: { id: loanId, tenantId } });
     if (!loan) throw new Error("Loan not found");
 
-    // Find Bad Debt Expense Account (Usually 6xxx or 6650 as configured)
+    // Find Bad Debt Expense Account
     const expenseAccount = await prisma.account.findFirst({
-        where: {
-            tenantId,
-            OR: [
-                { code: '6650' }, // Bad Debt Expense
-                { code: '6600' }  // Fallback to Financial Fees
-            ]
-        },
-        orderBy: { code: 'desc' } // Prioritize 6650
+        where: { tenantId, code: '6507' }, // Bad Debts Expense
     });
 
-    if (!expenseAccount) throw new Error("Bad Debt Expense account (6650) not found.");
+    if (!expenseAccount) throw new Error("Bad Debt Expense account (6507) not found.");
 
     const journal = await createJournalEntry({
         tenantId,
