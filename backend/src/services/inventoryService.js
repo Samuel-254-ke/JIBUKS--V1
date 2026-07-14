@@ -361,8 +361,6 @@ export async function createProduct({
         }
     });
 
-    console.log(`[InventoryService] Created product: ${product.name} (SKU: ${product.sku})`);
-
     return {
         ...product,
         costPrice: Number(product.costPrice),
@@ -620,8 +618,6 @@ export async function adjustStock({
         return { movement, updatedItem };
     });
 
-    console.log(`[InventoryService] Stock ${type}: ${item.name} | Qty: ${currentQty} -> ${newQty} | WAC: ${wacBefore} -> ${newWAC}`);
-
     return {
         success: true,
         movement: {
@@ -862,7 +858,6 @@ async function createStockMovementJournal({
 
             default:
                 // Default: No journal entry for unknown types
-                console.log(`[InventoryService] No journal pattern for: ${reasonConfig?.journalType}`);
                 return null;
         }
 
@@ -895,8 +890,6 @@ async function createStockMovementJournal({
                 }
             }
         });
-
-        console.log(`[InventoryService] Created journal ${journal.id} for ${reason || type}: ${description}`);
 
         return journal;
 

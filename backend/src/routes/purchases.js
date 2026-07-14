@@ -378,8 +378,6 @@ router.post('/', upload.single('attachment'), async (req, res) => {
                         description: `Input VAT - ${purchase.billNumber || `Purchase #${purchase.id}`}`
                     }
                 });
-
-                console.log(`✅ Input VAT recorded: KES ${totalVAT.toFixed(2)} → VAT Receivable (${vatReceivableAccount.code})`);
             }
 
             // Recalculate total including VAT
@@ -455,12 +453,6 @@ router.post('/', upload.single('attachment'), async (req, res) => {
                         })),
                         paymentAccountId: null, // Uses AP by default
                         date: purchaseDate || new Date(),
-                    });
-
-                    console.log(`[Purchases] Inventory accounting processed:`, {
-                        purchaseId: purchase.id,
-                        itemsProcessed: inventoryResult.movements?.length || 0,
-                        totalValue: inventoryResult.summary?.totalInventoryValue || 0
                     });
                 } catch (invError) {
                     console.error('[Purchases] Inventory accounting error:', invError);
@@ -728,7 +720,6 @@ router.post('/:id/payment', async (req, res) => {
                 });
                 if (unclearedAccount) {
                     creditAccountId = unclearedAccount.id;
-                    console.log(`[Purchases] Intercepted CHEQUE payment. Swapped Bank Account ID ${bankAccountId} for Uncleared Cheques ID ${unclearedAccount.id}`);
                 }
             }
 

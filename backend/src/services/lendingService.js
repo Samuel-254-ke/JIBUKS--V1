@@ -75,7 +75,7 @@ export async function issueLoan(tenantId, userId, data) {
 export async function recordLoanRepayment(tenantId, userId, data) {
     const { loanId, amount, depositedToAccountId, date } = data;
 
-    const loan = await prisma.loan.findUnique({ where: { id: loanId } });
+    const loan = await prisma.loan.findFirst({ where: { id: loanId, tenantId } });
     if (!loan) throw new Error("Loan not found");
 
     // 1. Create Accounting Entry
@@ -127,7 +127,8 @@ export async function recordLoanRepayment(tenantId, userId, data) {
  * - Credits Receivable (Account 1200)
  */
 export async function writeOffLoan(tenantId, userId, loanId) {
-    const loan = await prisma.loan.findUnique({ where: { id: loanId } });
+    const loan = await prisma.loan.findFirst({ where: { id: loanId, tenantId } });
+    if (!loan) throw new Error("Loan not found");
 
     // Find Bad Debt Expense Account (Usually 6xxx or 6650 as configured)
     const expenseAccount = await prisma.account.findFirst({

@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
-import { verifyJWT } from '../middleware/auth.js';
+import { verifyJWT, requireTenant } from '../middleware/auth.js';
 import {
     getAccountsReceivableAccountId,
     getDefaultRevenueAccountId,
@@ -12,6 +12,7 @@ const router = express.Router();
 
 // Apply JWT verification to all routes
 router.use(verifyJWT);
+router.use(requireTenant);
 
 // ============================================
 // GET ALL INVOICES
@@ -112,7 +113,7 @@ router.get('/:id', async (req, res) => {
 // ============================================
 router.post('/', async (req, res) => {
     try {
-        const { tenantId, userId } = req.user;
+        const { tenantId, id: userId } = req.user;
         const {
             customerId,
             invoiceNumber,
@@ -278,13 +279,6 @@ router.post('/', async (req, res) => {
                             sellingPrice: parseFloat(item.unitPrice)
                         })),
                         date: new Date(invoiceDate),
-                    });
-
-                    console.log(`[Invoices] COGS processed for ${invoiceNumber}:`, {
-                        revenue: cogsResult.summary?.totalRevenue || 0,
-                        cogs: cogsResult.summary?.totalCOGS || 0,
-                        grossProfit: cogsResult.summary?.grossProfit || 0,
-                        margin: `${cogsResult.summary?.grossMargin || 0}%`
                     });
                 } catch (cogsError) {
                     console.error('[Invoices] COGS accounting error:', cogsError);

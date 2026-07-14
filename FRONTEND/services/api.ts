@@ -10,34 +10,30 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
                 Constants.expoConfig?.extra?.eas?.[key] ||
                 defaultValue;
 
-  console.log(`🔧 Environment variable ${key}:`, value);
   return value;
 };
 
+// Fallback dev IP/port, only used when EXPO_PUBLIC_API_URL isn't set at build time.
+// Port matches the backend's default (see backend/.env.example).
 const LOCAL_IP = getEnvVar('EXPO_PUBLIC_LOCAL_IP', '192.168.1.69');
-const API_PORT = getEnvVar('EXPO_PUBLIC_API_PORT', '4400');
+const API_PORT = getEnvVar('EXPO_PUBLIC_API_PORT', '4001');
 
 // Build API base URL based on platform
 const getBaseUrl = (): string => {
   // First priority: Check for full production URL
   const fullUrl = getEnvVar('EXPO_PUBLIC_API_URL');
   if (fullUrl) {
-    console.log('✅ Using production API URL:', fullUrl);
     return fullUrl;
   }
 
   // Development fallback: construct URL based on platform
-  console.log('⚠️  No production URL found, using development configuration');
-  
   if (Platform.OS === 'android') {
     // Check if running on emulator or physical device
     // Emulator: use 10.0.2.2
     // Physical device: use local network IP
     const isEmulator = Constants.isDevice === false;
     const host = isEmulator ? '10.0.2.2' : LOCAL_IP;
-    const url = `http://${host}:${API_PORT}/api`;
-    console.log('🤖 Android URL:', url, isEmulator ? '(emulator)' : '(device)');
-    return url;
+    return `http://${host}:${API_PORT}/api`;
   }
 
   if (Platform.OS === 'ios') {
@@ -45,22 +41,14 @@ const getBaseUrl = (): string => {
     // Physical device uses local network IP
     const isSimulator = Constants.isDevice === false;
     const host = isSimulator ? 'localhost' : LOCAL_IP;
-    const url = `http://${host}:${API_PORT}/api`;
-    console.log('🍎 iOS URL:', url, isSimulator ? '(simulator)' : '(device)');
-    return url;
+    return `http://${host}:${API_PORT}/api`;
   }
 
   // Web uses localhost
-  const url = `http://localhost:${API_PORT}/api`;
-  console.log('🌐 Web URL:', url);
-  return url;
+  return `http://localhost:${API_PORT}/api`;
 };
 
 const API_BASE_URL = getBaseUrl();
-
-console.log('🌐 API Base URL:', API_BASE_URL);
-console.log('📱 Platform:', Platform.OS);
-console.log('🔧 Device:', Constants.isDevice ? 'Physical' : 'Simulator/Emulator');
 
 // TypeScript interfaces
 export type TenantType = 'FAMILY' | 'BUSINESS';
@@ -277,16 +265,6 @@ class ApiService {
     }
 
     try {
-      console.log(`📡 API Request Details:`, {
-        method: options.method || 'GET',
-        url: url,
-        baseUrl: this.baseUrl,
-        endpoint: endpoint,
-        headers: headers,
-        bodyType: typeof options.body,
-        hasBody: !!options.body
-      });
-
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -297,32 +275,18 @@ class ApiService {
         },
       });
 
-      console.log(`📲 API Response:`, {
-        url: url,
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: response.headers
-      });
-
       const data = await response.json() as { error?: string };
 
       if (!response.ok) {
-        console.error('❌ API Error Response:', {
+        console.error('API Error Response:', {
           url: url,
           status: response.status,
           error: data.error,
-          data: data
         });
         throw {
           error: data.error || 'An error occurred',
         } as ApiError;
       }
-
-      console.log('✅ API Success:', {
-        url: url,
-        status: response.status
-      });
 
       return data as T;
     } catch (error: any) {
@@ -844,21 +808,11 @@ class ApiService {
     if (params.limit) query.append('limit', String(params.limit));
     const suffix = query.toString() ? `?${query.toString()}` : '';
 
-    try {
-      return await this.request<Transaction[]>(`/transactions${suffix}`);
-    } catch (error) {
-      console.error('getTransactions failed:', error);
-      return [];
-    }
+    return this.request<Transaction[]>(`/transactions${suffix}`);
   }
 
   async getTransactionStats(): Promise<TransactionStats> {
-    try {
-      return await this.request<TransactionStats>('/transactions/stats');
-    } catch (error) {
-      console.error('getTransactionStats failed:', error);
-      return { totalIncome: 0, totalExpenses: 0, net: 0 };
-    }
+    return this.request<TransactionStats>('/transactions/stats');
   }
 
   async createPurchase(data: any): Promise<any> {
@@ -894,12 +848,7 @@ class ApiService {
   }
 
   async getDashboard(): Promise<any> {
-    try {
-      return await this.request('/family/dashboard');
-    } catch (error) {
-      console.error('getDashboard failed:', error);
-      return null;
-    }
+    return this.request('/family/dashboard');
   }
 
   /**
@@ -984,9 +933,7 @@ class ApiService {
     }
     const suffix = query.toString() ? `?${query.toString()}` : '';
 
-    console.log('📊 Fetching accounts from backend:', `/accounts${suffix}`);
     const accounts = await this.request<Account[]>(`/accounts${suffix}`);
-    console.log('✅ Accounts loaded from database:', accounts.length);
     return accounts;
   }
 
@@ -1071,31 +1018,11 @@ class ApiService {
     if (startDate) query.append('startDate', startDate);
     if (endDate) query.append('endDate', endDate);
     const suffix = query.toString() ? `?${query.toString()}` : '';
-    try {
-      return await this.request<any>(`/reports/summary${suffix}`);
-    } catch {
-      return {
-        keyMetrics: { totalIncome: 120000, totalExpenses: 95420, netIncome: 24580, savingsRate: 20.5, netWorth: 850000, totalCash: 142500 },
-        topExpenses: [
-          { name: 'Food & Dining', amount: 32450 },
-          { name: 'Transport',     amount: 21800 },
-          { name: 'Monthly Bills', amount: 18200 },
-          { name: 'Health',        amount: 11800 },
-        ],
-      };
-    }
+    return this.request<any>(`/reports/summary${suffix}`);
   }
 
   async getMonthlyTrend(months: number = 6): Promise<any> {
-    try {
-      return await this.request<any>(`/reports/monthly-trend?months=${months}`);
-    } catch {
-      return {
-        months: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN'],
-        income:  [80000, 95000, 72000, 88000, 68000, 120000],
-        expense: [65000, 82000, 88000, 62000, 92000, 95420],
-      };
-    }
+    return this.request<any>(`/reports/monthly-trend?months=${months}`);
   }
 
   async getCategoryAnalysis(startDate?: string, endDate?: string): Promise<any> {
@@ -1103,18 +1030,7 @@ class ApiService {
     if (startDate) query.append('startDate', startDate);
     if (endDate) query.append('endDate', endDate);
     const suffix = query.toString() ? `?${query.toString()}` : '';
-    try {
-      return await this.request<any>(`/reports/category-analysis${suffix}`);
-    } catch {
-      return {
-        categories: [
-          { label: 'Food & Dining',    icon: 'restaurant', iconBg: '#FFF7ED', iconColor: '#F97316', amount: 32450, transactions: 42, pct: 38.5, color: '#EF4444', badgeBg: '#FEF3C7', badgeColor: '#92400E' },
-          { label: 'Transport',        icon: 'car',         iconBg: '#EFF6FF', iconColor: '#3B82F6', amount: 21800, transactions: 18, pct: 25.8, color: '#1a3a8f', badgeBg: '#DBEAFE', badgeColor: '#1E40AF' },
-          { label: 'Monthly Bills',    icon: 'receipt',     iconBg: '#F0FDF4', iconColor: '#22C55E', amount: 18200, transactions: 5,  pct: 21.6, color: '#22C55E', badgeBg: '#DCFCE7', badgeColor: '#166534' },
-          { label: 'Health & Fitness', icon: 'fitness',     iconBg: '#FEF2F2', iconColor: '#EF4444', amount: 11800, transactions: 12, pct: 14.1, color: '#F59E0B', badgeBg: '#FEE2E2', badgeColor: '#991B1B' },
-        ],
-      };
-    }
+    return this.request<any>(`/reports/category-analysis${suffix}`);
   }
 
   async getAccountTransactions(accountId: string | number, params?: {
@@ -1338,12 +1254,7 @@ class ApiService {
   // ─── Family Budget APIs ────────────────────────────────────────────────────
 
   async getFamilyBudgets(): Promise<any[]> {
-    try {
-      return await this.request('/family/budgets');
-    } catch (error) {
-      console.error('getFamilyBudgets failed:', error);
-      return [];
-    }
+    return this.request('/family/budgets');
   }
 
   async createFamilyBudget(data: {
@@ -1380,33 +1291,7 @@ class ApiService {
   // ─── Family Groups / Chama APIs ───────────────────────────────────────────
 
   async getFamilyGroups(): Promise<any[]> {
-    try {
-      return await this.request('/family/groups');
-    } catch {
-      return [
-        {
-          id: 1, name: 'Umoja Chama', description: 'Monthly Contribution',
-          target: 300000, saved: 120000, type: 'chama', color: '#1a3a8f',
-          totalMembers: 8, status: 'active',
-          members: [{ id: 1, name: 'Jane', avatar: null }, { id: 2, name: 'Kallen', avatar: null }, { id: 3, name: 'Brian', avatar: null }],
-          treasurer: { name: 'John Treasurer', phone: '+254 712 345 678', method: 'M-Pesa' },
-        },
-        {
-          id: 2, name: 'Holiday Trip', description: 'Coast Expedition 2024',
-          target: 500000, saved: 450000, type: 'savings', color: '#10B981',
-          totalMembers: 5, status: 'active',
-          members: [{ id: 1, name: 'Jane', avatar: null }, { id: 2, name: 'Kallen', avatar: null }],
-          treasurer: { name: 'Jane Smith', phone: '+254 722 000 001', method: 'M-Pesa' },
-        },
-        {
-          id: 3, name: 'Family Investment', description: 'Real Estate Fund',
-          target: 420000, saved: 272000, type: 'investment', color: '#F59E0B',
-          totalMembers: 4, status: 'active',
-          members: [{ id: 1, name: 'Jane', avatar: null }, { id: 2, name: 'Kallen', avatar: null }, { id: 3, name: 'Brian', avatar: null }, { id: 4, name: 'Sarah', avatar: null }],
-          treasurer: { name: 'Kallen Doe', phone: '+254 711 000 002', method: 'M-Pesa' },
-        },
-      ];
-    }
+    return this.request('/family/groups');
   }
 
   async getGroupDetails(id: string | number): Promise<any> {

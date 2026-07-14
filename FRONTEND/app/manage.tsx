@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import apiService from '@/services/api';
+import Toast from 'react-native-toast-message';
 
 export default function ManageScreen() {
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function ManageScreen() {
       setStats(statsData);
     } catch (error) {
       console.error('Error loading data:', error);
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load data' });
     } finally {
       setLoading(false);
     }

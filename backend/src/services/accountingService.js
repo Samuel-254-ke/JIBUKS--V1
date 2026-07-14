@@ -1383,8 +1383,6 @@ export async function createJournalEntry({
         });
     });
 
-    console.log(`[AccountingService] Created journal ${journal.id} with ${journal.lines.length} lines`);
-
     return journal;
 }
 
@@ -1439,8 +1437,6 @@ export async function voidJournalEntry(journalId) {
             });
         }
     });
-
-    console.log(`[AccountingService] Voided journal ${journalId}`);
 }
 
 // ============================================
@@ -2124,8 +2120,8 @@ export async function createFixedAsset(tenantId, userId, assetData) {
  * Updates the value of an asset (Depreciation)
  */
 export async function depreciateAsset(tenantId, userId, assetId, newValue) {
-    const asset = await prisma.fixedAsset.findUnique({
-        where: { id: assetId },
+    const asset = await prisma.fixedAsset.findFirst({
+        where: { id: assetId, tenantId },
         include: { assetAccount: true }
     });
 
@@ -2255,8 +2251,8 @@ export async function depreciateAsset(tenantId, userId, assetId, newValue) {
 export async function disposeAsset(tenantId, userId, assetId, disposalData) {
     const { disposalPrice, disposalAccountId, date } = disposalData;
 
-    const asset = await prisma.fixedAsset.findUnique({
-        where: { id: assetId }
+    const asset = await prisma.fixedAsset.findFirst({
+        where: { id: assetId, tenantId }
     });
 
     if (!asset) throw new Error("Asset not found");

@@ -1,12 +1,15 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { verifyJWT as authenticateToken } from '../middleware/auth.js';
+import { verifyJWT as authenticateToken, requireTenant } from '../middleware/auth.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
+router.use(authenticateToken);
+router.use(requireTenant);
+
 // GET /api/vat-rates - Get all active VAT rates for the tenant
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
 
@@ -28,7 +31,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // GET /api/vat-rates/:id - Get specific VAT rate
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.user.tenantId;
@@ -52,7 +55,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/vat-rates - Create new VAT rate (Admin only)
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const { name, rate, code, description, isActive } = req.body;
@@ -84,7 +87,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/vat-rates/:id - Update VAT rate
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.user.tenantId;
@@ -120,7 +123,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/vat-rates/:id - Delete VAT rate
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.user.tenantId;

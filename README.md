@@ -177,7 +177,7 @@ JIBUKS--V1/
 │   └── package.json
 │
 ├── README.md                    # This file
-├── QUICK_START.md              # Quick start guide
+├── docs/                        # Canonical system documentation
 └── .gitignore
 ```
 
