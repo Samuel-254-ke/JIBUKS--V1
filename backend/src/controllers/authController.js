@@ -26,20 +26,15 @@ async function login(req, res, next) {
       return res.status(400).json({ error: 'email and password required' });
     }
 
-    console.log(`[Login] Finding user: ${email}`);
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      console.log(`[Login] User not found: ${email}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    console.log(`[Login] User found, comparing password...`);
 
     const match = await bcrypt.compare(password, user.password || '');
     if (!match) {
-      console.log(`[Login] Password mismatch for: ${email}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    console.log(`[Login] Password matched, generating tokens...`);
 
     const accessToken = generateToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -52,9 +47,6 @@ async function login(req, res, next) {
       });
       tenantType = tenant?.tenantType ?? null;
     }
-
-    const duration = Date.now() - startTime;
-    console.log(`[Login] ✅ Success for ${email} (${duration}ms)`);
 
     res.json({
       accessToken,
@@ -235,6 +227,9 @@ async function refreshToken(req, res, next) {
 
     try {
       const decoded = jwt.verify(refreshToken, JWT_SECRET);
+      if (decoded.type !== 'refresh') {
+        return res.status(401).json({ error: 'Invalid token type' });
+      }
       const user = await prisma.user.findUnique({ where: { id: decoded.id } });
       if (!user) {
         return res.status(401).json({ error: 'User not found' });

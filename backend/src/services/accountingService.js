@@ -335,6 +335,13 @@ export const FAMILY_COA_TEMPLATE = [
     { code: '2131', name: 'Rental Income Tax Payable', type: 'LIABILITY', description: 'Tax on rental income (10%)', isSystem: false, isContra: false, subtype: 'taxes_payable', parentCode: '2100' },
 
     // ----------------------------------------
+    // UNCLEARED CHEQUES (2150)
+    // Required by the cheque management feature (routes/cheques.js) to
+    // track post-dated cheques written but not yet cleared by the bank.
+    // ----------------------------------------
+    { code: '2150', name: 'Uncleared Cheques Payable', type: 'LIABILITY', description: 'Tracks post-dated cheques that have been written but not yet cleared by the bank', isSystem: true, isContra: false, subtype: 'current_liability', systemTag: 'UNCLEARED_CHEQUES' },
+
+    // ----------------------------------------
     // PAYROLL LIABILITIES (2200-2299)
     // Employee-related payables
     // ----------------------------------------
@@ -549,6 +556,15 @@ export const FAMILY_COA_TEMPLATE = [
     { code: '4280', name: 'Late Fee Income', type: 'INCOME', description: 'Fees charged on late payments', isSystem: false, isContra: false, subtype: 'other_income', parentCode: '4200' },
     { code: '4290', name: 'Miscellaneous Income', type: 'INCOME', description: 'Other minor income sources', isSystem: false, isContra: false, subtype: 'other_income', parentCode: '4200' },
 
+    // ----------------------------------------
+    // PERSONAL / FAMILY INCOME (4291-4299)
+    // Income sources with no business-accounting equivalent, used by the
+    // FAMILY tenant type's default transaction categories.
+    // ----------------------------------------
+    { code: '4291', name: 'Salary & Wages Income', type: 'INCOME', description: 'Salary or wages received from employment', isSystem: false, isContra: false, subtype: 'other_income', parentCode: '4200' },
+    { code: '4292', name: 'Investment Income', type: 'INCOME', description: 'Returns from personal investments', isSystem: false, isContra: false, subtype: 'other_income', parentCode: '4200' },
+    { code: '4293', name: 'Gift Income', type: 'INCOME', description: 'Money received as a gift', isSystem: false, isContra: false, subtype: 'other_income', parentCode: '4200' },
+
     // ============================================
     // EXPENSES (5000-8999)
     // ============================================
@@ -600,6 +616,24 @@ export const FAMILY_COA_TEMPLATE = [
     { code: '6107', name: 'Staff Welfare & Meals', type: 'EXPENSE', description: 'Tea, lunch, staff events', isSystem: false, isContra: false, subtype: 'operating_expense', parentCode: '6100' },
     { code: '6108', name: 'Staff Training', type: 'EXPENSE', description: 'Workshops and courses', isSystem: false, isContra: false, subtype: 'operating_expense', parentCode: '6100' },
     { code: '6109', name: 'Medical Insurance', type: 'EXPENSE', description: 'Staff health cover', isSystem: false, isContra: false, subtype: 'operating_expense', parentCode: '6100' },
+
+    // ----------------------------------------
+    // PERSONAL / FAMILY EXPENSES (6110-6199)
+    // Everyday living expenses with no business-accounting equivalent,
+    // used by the FAMILY tenant type's default transaction categories.
+    // ----------------------------------------
+    { code: '6110', name: 'Food & Dining', type: 'EXPENSE', description: 'Meals, dining out, takeaway', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6111', name: 'Groceries', type: 'EXPENSE', description: 'Household grocery shopping', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6112', name: 'Personal Care', type: 'EXPENSE', description: 'Grooming, toiletries, salon/barber', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6113', name: 'Shopping', type: 'EXPENSE', description: 'General personal shopping', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6114', name: 'Pet Care', type: 'EXPENSE', description: 'Pet food, vet bills, supplies', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6115', name: 'Childcare', type: 'EXPENSE', description: 'Daycare, babysitting, school fees', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6116', name: 'Gym & Fitness', type: 'EXPENSE', description: 'Gym membership, fitness classes', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6117', name: 'Personal Entertainment', type: 'EXPENSE', description: 'Movies, streaming, hobbies, outings', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6118', name: 'Personal Healthcare', type: 'EXPENSE', description: 'Medical bills, pharmacy, personal health', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6119', name: 'Personal Education', type: 'EXPENSE', description: 'School fees, courses, books', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6120', name: 'Personal Insurance', type: 'EXPENSE', description: 'Life, health, or property insurance premiums', isSystem: false, isContra: false, subtype: 'operating_expense' },
+    { code: '6121', name: 'Personal Subscriptions', type: 'EXPENSE', description: 'Streaming, memberships, personal software', isSystem: false, isContra: false, subtype: 'operating_expense' },
 
     // ----------------------------------------
     // OFFICE & ADMIN (6200-6299)
@@ -727,10 +761,10 @@ export const FAMILY_COA_TEMPLATE = [
     { code: '4160', name: 'Revenue - General', type: 'INCOME', subtype: 'sales_revenue', description: 'General business revenue', detailType: 'Revenue - General' },
     { code: '4170', name: 'Sales - retail', type: 'INCOME', subtype: 'sales_revenue', description: 'Retail sales revenue', detailType: 'Sales - retail' },
     { code: '4180', name: 'Sales - wholesale', type: 'INCOME', subtype: 'sales_revenue', description: 'Wholesale sales revenue', detailType: 'Sales - wholesale' },
-    { code: '4190', name: 'Sales of Product Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Product sales', detailType: 'Sales of Product Income' },
-    { code: '4191', name: 'Service/Fee Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Standard service income', detailType: 'Service/Fee Income' },
-    { code: '4192', name: 'Discounts/Refunds Given', type: 'INCOME', subtype: 'sales_contra', description: 'Discounts or refunds granted', detailType: 'Discounts/Refunds Given', isContra: true },
-    { code: '4193', name: 'Non-Profit Income', type: 'INCOME', subtype: 'other_income', description: 'Income from non-profit activities', detailType: 'Non-Profit Income' },
+    { code: '4196', name: 'Sales of Product Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Product sales', detailType: 'Sales of Product Income' },
+    { code: '4197', name: 'Service/Fee Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Standard service income', detailType: 'Service/Fee Income' },
+    { code: '4198', name: 'Discounts/Refunds Given', type: 'INCOME', subtype: 'sales_contra', description: 'Discounts or refunds granted', detailType: 'Discounts/Refunds Given', isContra: true },
+    { code: '4199', name: 'Non-Profit Income', type: 'INCOME', subtype: 'other_income', description: 'Income from non-profit activities', detailType: 'Non-Profit Income' },
     { code: '4194', name: 'Other Primary Income', type: 'INCOME', subtype: 'sales_revenue', description: 'Other main business income', detailType: 'Other Primary Income' },
     { code: '4195', name: 'Unapplied Cash Payment Income', type: 'INCOME', subtype: 'other_income', description: 'Cash received but not yet applied', detailType: 'Unapplied Cash Payment Income' },
     { code: '4205', name: 'Uncategorised Income', type: 'INCOME', subtype: 'other_income', description: 'Unclassified income' },
@@ -810,47 +844,47 @@ export const FAMILY_COA_TEMPLATE = [
  */
 export const CATEGORY_ACCOUNT_MAP = {
     // Income Categories
-    'Salary': { incomeAccount: '4000', defaultAssetAccount: '1020' },  // Equity Bank
-    'Business': { incomeAccount: '4010', defaultAssetAccount: '1010' }, // M-PESA
-    'Investment': { incomeAccount: '4020', defaultAssetAccount: '1020' }, // Equity Bank
-    'Gift': { incomeAccount: '4030', defaultAssetAccount: '1001' }, // Cash
-    'Rental': { incomeAccount: '4040', defaultAssetAccount: '1020' }, // Equity Bank
-    'Other Income': { incomeAccount: '4050', defaultAssetAccount: '1001' }, // Cash
+    'Salary': { incomeAccount: '4291', defaultAssetAccount: '1020' },  // Salary & Wages Income / Equity Bank
+    'Business': { incomeAccount: '4160', defaultAssetAccount: '1010' }, // Revenue - General / M-PESA
+    'Investment': { incomeAccount: '4292', defaultAssetAccount: '1020' }, // Investment Income / Equity Bank
+    'Gift': { incomeAccount: '4293', defaultAssetAccount: '1000' }, // Gift Income / Cash
+    'Rental': { incomeAccount: '4250', defaultAssetAccount: '1020' }, // Rental Income / Equity Bank
+    'Other Income': { incomeAccount: '4200', defaultAssetAccount: '1000' }, // Other Income / Cash
 
     // Sales Revenue
-    'Product Sales': { incomeAccount: '4100', defaultAssetAccount: '1010' }, // M-PESA
-    'Service Sales': { incomeAccount: '4110', defaultAssetAccount: '1010' }, // M-PESA
+    'Product Sales': { incomeAccount: '4100', defaultAssetAccount: '1010' }, // Sales Revenue / M-PESA
+    'Service Sales': { incomeAccount: '4102', defaultAssetAccount: '1010' }, // Service Revenue / M-PESA
 
-    // Expense Categories (Aligned to new 6000 series)
-    'Food': { expenseAccount: '6100', defaultAssetAccount: '1001' }, // Cash
-    'Groceries': { expenseAccount: '6110', defaultAssetAccount: '1001' }, // Cash
-    'Transport': { expenseAccount: '6200', defaultAssetAccount: '1001' }, // Cash
-    'Housing': { expenseAccount: '6000', defaultAssetAccount: '1020' }, // Equity Bank
-    'Rent': { expenseAccount: '6010', defaultAssetAccount: '1020' }, // Equity Bank
-    'Utilities': { expenseAccount: '6000', defaultAssetAccount: '1010' }, // M-PESA
-    'Healthcare': { expenseAccount: '6300', defaultAssetAccount: '1001' }, // Cash
-    'Education': { expenseAccount: '6400', defaultAssetAccount: '1020' }, // Equity Bank
-    'Entertainment': { expenseAccount: '6500', defaultAssetAccount: '1001' }, // Cash
-    'Shopping': { expenseAccount: '6140', defaultAssetAccount: '1001' }, // Cash
-    'Communication': { expenseAccount: '6060', defaultAssetAccount: '1010' }, // M-PESA
-    'Insurance': { expenseAccount: '6310', defaultAssetAccount: '1020' }, // Equity Bank
-    'Donations': { expenseAccount: '5199', defaultAssetAccount: '1001' }, // Cash
-    'Other Expenses': { expenseAccount: '5199', defaultAssetAccount: '1001' }, // Cash
+    // Expense Categories
+    'Food': { expenseAccount: '6110', defaultAssetAccount: '1000' }, // Food & Dining / Cash
+    'Groceries': { expenseAccount: '6111', defaultAssetAccount: '1000' }, // Groceries / Cash
+    'Transport': { expenseAccount: '6400', defaultAssetAccount: '1000' }, // Transport & Travel / Cash
+    'Housing': { expenseAccount: '6010', defaultAssetAccount: '1020' }, // Housing & Utilities / Equity Bank
+    'Rent': { expenseAccount: '6011', defaultAssetAccount: '1020' }, // Rent Expense / Equity Bank
+    'Utilities': { expenseAccount: '6010', defaultAssetAccount: '1010' }, // Housing & Utilities / M-PESA
+    'Healthcare': { expenseAccount: '6118', defaultAssetAccount: '1000' }, // Personal Healthcare / Cash
+    'Education': { expenseAccount: '6119', defaultAssetAccount: '1020' }, // Personal Education / Equity Bank
+    'Entertainment': { expenseAccount: '6117', defaultAssetAccount: '1000' }, // Personal Entertainment / Cash
+    'Shopping': { expenseAccount: '6113', defaultAssetAccount: '1000' }, // Shopping / Cash
+    'Communication': { expenseAccount: '6204', defaultAssetAccount: '1010' }, // Telephone & Airtime / M-PESA
+    'Insurance': { expenseAccount: '6120', defaultAssetAccount: '1020' }, // Personal Insurance / Equity Bank
+    'Donations': { expenseAccount: '8030', defaultAssetAccount: '1000' }, // Charitable Donations & CSR / Cash
+    'Other Expenses': { expenseAccount: '5199', defaultAssetAccount: '1000' }, // Uncategorized Expense / Cash
 
     // Business Expense Categories
-    'COGS': { expenseAccount: '5200', defaultAssetAccount: '1300' },
-    'Bank Charges': { expenseAccount: '6610', defaultAssetAccount: '1020' }, // Equity Bank
-    'Interest Expense': { expenseAccount: '6620', defaultAssetAccount: '1020' }, // Equity Bank
-    'Depreciation': { expenseAccount: '5300', defaultAssetAccount: '1590' },
+    'COGS': { expenseAccount: '5000', defaultAssetAccount: '1300' },
+    'Bank Charges': { expenseAccount: '6501', defaultAssetAccount: '1020' }, // Equity Bank
+    'Interest Expense': { expenseAccount: '6506', defaultAssetAccount: '1020' }, // Equity Bank
+    'Depreciation': { expenseAccount: '6900', defaultAssetAccount: '1300' },
     'Salaries': { expenseAccount: '5400', defaultAssetAccount: '1020' }, // Equity Bank
 
     // Additional Standard Categories
-    'Subscriptions': { expenseAccount: '6510', defaultAssetAccount: '1010' }, // M-PESA
-    'Personal Care': { expenseAccount: '6130', defaultAssetAccount: '1001' }, // Cash
-    'Pet Care': { expenseAccount: '6450', defaultAssetAccount: '1001' }, // Cash
-    'Childcare': { expenseAccount: '6430', defaultAssetAccount: '1001' }, // Cash
-    'Gym': { expenseAccount: '6340', defaultAssetAccount: '1010' }, // M-PESA
-    'Fitness': { expenseAccount: '6340', defaultAssetAccount: '1010' }, // M-PESA
+    'Subscriptions': { expenseAccount: '6121', defaultAssetAccount: '1010' }, // Personal Subscriptions / M-PESA
+    'Personal Care': { expenseAccount: '6112', defaultAssetAccount: '1000' }, // Personal Care / Cash
+    'Pet Care': { expenseAccount: '6114', defaultAssetAccount: '1000' }, // Pet Care / Cash
+    'Childcare': { expenseAccount: '6115', defaultAssetAccount: '1000' }, // Childcare / Cash
+    'Gym': { expenseAccount: '6116', defaultAssetAccount: '1010' }, // Gym & Fitness / M-PESA
+    'Fitness': { expenseAccount: '6116', defaultAssetAccount: '1010' }, // Gym & Fitness / M-PESA
 };
 
 const KEYWORD_ACCOUNT_MAP = {
@@ -935,6 +969,7 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
                     description: acc.description,
                     subtype: acc.subtype,
                     detailType: acc.detailType,
+                    systemTag: acc.systemTag || null,
                 },
                 create: {
                     tenantId,
@@ -949,6 +984,7 @@ export async function seedFamilyCoA(tenantId, currency = 'KES') {
                     isPaymentEligible: acc.isPaymentEligible || false,
                     isActive: true,
                     currency,
+                    systemTag: acc.systemTag || null,
                 }
             });
         }
@@ -1383,8 +1419,6 @@ export async function createJournalEntry({
         });
     });
 
-    console.log(`[AccountingService] Created journal ${journal.id} with ${journal.lines.length} lines`);
-
     return journal;
 }
 
@@ -1439,8 +1473,6 @@ export async function voidJournalEntry(journalId) {
             });
         }
     });
-
-    console.log(`[AccountingService] Voided journal ${journalId}`);
 }
 
 // ============================================
@@ -2124,8 +2156,8 @@ export async function createFixedAsset(tenantId, userId, assetData) {
  * Updates the value of an asset (Depreciation)
  */
 export async function depreciateAsset(tenantId, userId, assetId, newValue) {
-    const asset = await prisma.fixedAsset.findUnique({
-        where: { id: assetId },
+    const asset = await prisma.fixedAsset.findFirst({
+        where: { id: assetId, tenantId },
         include: { assetAccount: true }
     });
 
@@ -2255,8 +2287,8 @@ export async function depreciateAsset(tenantId, userId, assetId, newValue) {
 export async function disposeAsset(tenantId, userId, assetId, disposalData) {
     const { disposalPrice, disposalAccountId, date } = disposalData;
 
-    const asset = await prisma.fixedAsset.findUnique({
-        where: { id: assetId }
+    const asset = await prisma.fixedAsset.findFirst({
+        where: { id: assetId, tenantId }
     });
 
     if (!asset) throw new Error("Asset not found");

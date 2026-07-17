@@ -5,15 +5,17 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
 import * as inventoryService from '../services/inventoryService.js';
-import { verifyJWT as authenticate } from '../middleware/auth.js';
+import { verifyJWT as authenticate, requireTenant } from '../middleware/auth.js';
 
 const router = express.Router();
+router.use(authenticate);
+router.use(requireTenant);
 
 /**
  * GET /api/inventory/item-types
  * List all available item types (Service, Inventory, etc)
  */
-router.get('/item-types', authenticate, async (req, res) => {
+router.get('/item-types', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const types = await prisma.itemType.findMany({
@@ -31,7 +33,7 @@ router.get('/item-types', authenticate, async (req, res) => {
  * GET /api/inventory
  * List all products (alias for /products for backward compatibility)
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const {
@@ -125,7 +127,7 @@ router.get('/', authenticate, async (req, res) => {
  * GET /api/inventory/products
  * List all products with filtering, searching, and pagination
  */
-router.get('/products', authenticate, async (req, res) => {
+router.get('/products', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const {
@@ -202,7 +204,7 @@ router.get('/products', authenticate, async (req, res) => {
  * GET /api/inventory/alerts
  * Get low stock alerts specifically
  */
-router.get('/alerts', authenticate, async (req, res) => {
+router.get('/alerts', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
 
@@ -247,7 +249,7 @@ router.get('/alerts', authenticate, async (req, res) => {
  * POST /api/inventory/products
  * Create a new product
  */
-router.post('/products', authenticate, async (req, res) => {
+router.post('/products', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const userId = req.user.id;
@@ -287,7 +289,7 @@ router.post('/products', authenticate, async (req, res) => {
  * GET /api/inventory/products/:id
  * Get single product details + recent history
  */
-router.get('/products/:id', authenticate, async (req, res) => {
+router.get('/products/:id', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const productId = parseInt(req.params.id);
@@ -318,7 +320,7 @@ router.get('/products/:id', authenticate, async (req, res) => {
  * POST /api/inventory/adjust
  * Adjust stock (IN/OUT/Correction)
  */
-router.post('/adjust', authenticate, async (req, res) => {
+router.post('/adjust', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const userId = req.user.id;
@@ -347,7 +349,7 @@ router.post('/adjust', authenticate, async (req, res) => {
  * GET /api/inventory/transactions
  * List inventory movements/transactions
  */
-router.get('/transactions', authenticate, async (req, res) => {
+router.get('/transactions', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const { page = 1, limit = 50, itemId } = req.query;
@@ -389,7 +391,7 @@ router.get('/transactions', authenticate, async (req, res) => {
  * GET /api/inventory/valuation/current
  * Get total inventory valuation and breakdown by category
  */
-router.get('/valuation/current', authenticate, async (req, res) => {
+router.get('/valuation/current', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
 
@@ -487,7 +489,7 @@ router.get('/valuation/current', authenticate, async (req, res) => {
  */
 import { masterCatalog } from '../data/masterCatalog.js';
 
-router.get('/catalog', authenticate, (req, res) => {
+router.get('/catalog', (req, res) => {
     try {
         const { search, category } = req.query;
         let results = masterCatalog;
@@ -529,9 +531,9 @@ import * as inventoryAccountingService from '../services/inventoryAccountingServ
  * - Revenue Reversal: DR Sales Returns, CR AR
  * - COGS Reversal: DR Inventory Asset, CR COGS
  */
-router.post('/credit-memo', authenticate, async (req, res) => {
+router.post('/credit-memo', async (req, res) => {
     try {
-        const { tenantId, userId } = req.user;
+        const { tenantId, id: userId } = req.user;
         const { invoiceId, creditMemoNumber, items, date } = req.body;
 
         if (!items || items.length === 0) {
@@ -571,9 +573,9 @@ router.post('/credit-memo', authenticate, async (req, res) => {
  * For shrinkage: DR Shrinkage Expense, CR Inventory Asset
  * For found stock: DR Inventory Asset, CR Other Income
  */
-router.post('/adjust', authenticate, async (req, res) => {
+router.post('/adjust', async (req, res) => {
     try {
-        const { tenantId, userId } = req.user;
+        const { tenantId, id: userId } = req.user;
         const {
             itemId,
             reason,
@@ -630,9 +632,9 @@ router.post('/adjust', authenticate, async (req, res) => {
  * Sets the quantity to the actual counted value
  * Creates adjustment journal entries as needed
  */
-router.post('/physical-count', authenticate, async (req, res) => {
+router.post('/physical-count', async (req, res) => {
     try {
-        const { tenantId, userId } = req.user;
+        const { tenantId, id: userId } = req.user;
         const { itemId, actualQuantity, notes, date } = req.body;
 
         if (!itemId) {
@@ -676,7 +678,7 @@ router.post('/physical-count', authenticate, async (req, res) => {
  * - Breakdown by category
  * - Top items by value
  */
-router.get('/accounting/valuation', authenticate, async (req, res) => {
+router.get('/accounting/valuation', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
 
@@ -698,7 +700,7 @@ router.get('/accounting/valuation', authenticate, async (req, res) => {
  * GET /api/inventory/:itemId/history
  * Get stock movement history for an item
  */
-router.get('/:itemId/history', authenticate, async (req, res) => {
+router.get('/:itemId/history', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const { itemId } = req.params;
@@ -775,7 +777,7 @@ router.get('/:itemId/history', authenticate, async (req, res) => {
  * GET /api/inventory/cogs-report
  * Get Cost of Goods Sold report for a period
  */
-router.get('/cogs-report', authenticate, async (req, res) => {
+router.get('/cogs-report', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const { startDate, endDate } = req.query;

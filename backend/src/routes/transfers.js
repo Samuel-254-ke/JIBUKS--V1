@@ -120,9 +120,9 @@ router.post('/', async (req, res) => {
 
         // 3. If there's a fee, debit Bank Charges expense account
         if (parsedFee > 0) {
-            // Find Bank Charges account (6610)
+            // Find Bank Charges account (6501 - Bank Service Charges)
             const bankChargesAccount = await prisma.account.findFirst({
-                where: { tenantId, code: '6610' }
+                where: { tenantId, code: '6501' }
             });
 
             if (bankChargesAccount) {
@@ -133,7 +133,7 @@ router.post('/', async (req, res) => {
                     description: 'Transfer fee / Bank charges',
                 });
             } else {
-                console.warn('[Transfers] Bank Charges account (6610) not found. Fee not recorded as expense.');
+                console.warn('[Transfers] Bank Charges account (6501) not found. Fee not recorded as expense.');
             }
         }
 
@@ -173,8 +173,6 @@ router.post('/', async (req, res) => {
                 }
             }
         });
-
-        console.log(`[Transfers] Created transfer ${transfer.id} from ${fromAccount.name} to ${toAccount.name}`);
 
         res.status(201).json({
             ...transfer,

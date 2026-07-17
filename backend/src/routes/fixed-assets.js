@@ -1,11 +1,12 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
-import { verifyJWT } from '../middleware/auth.js';
+import { verifyJWT, requireTenant } from '../middleware/auth.js';
 import { createFixedAsset, depreciateAsset, disposeAsset } from '../services/accountingService.js';
 
 const router = express.Router();
 
 router.use(verifyJWT);
+router.use(requireTenant);
 
 // ============================================
 // FIXED ASSETS MANAGEMENT ROUTES

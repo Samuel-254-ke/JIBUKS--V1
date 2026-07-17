@@ -12,8 +12,6 @@ const prisma = new PrismaClient({
   log: ['error', 'warn'],
 });
 
-console.log('✅ Prisma client initialized');
-
 function getPrismaClient() {
   return prisma;
 }

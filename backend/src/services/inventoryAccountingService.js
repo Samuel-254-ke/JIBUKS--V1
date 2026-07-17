@@ -412,8 +412,6 @@ export async function processInventoryPurchase({
                 });
             }
 
-            console.log(`[InventoryAccounting] Created purchase journal ${journal.id}: DR Inventory ${totalInventoryValue}, CR ${paymentAccountId ? 'Cash/Bank' : 'AP'}`);
-
             return {
                 success: true,
                 movements: results,
@@ -631,8 +629,6 @@ export async function processInventorySale({
                 });
             }
 
-            console.log(`[InventoryAccounting] Created COGS journal ${journal.id}: DR COGS ${totalCOGS}, CR Inventory`);
-
             return {
                 success: true,
                 movements: results,
@@ -841,8 +837,6 @@ export async function processCustomerReturn({
                     data: { journalId: cogsJournal.id }
                 });
             }
-
-            console.log(`[InventoryAccounting] Created COGS reversal journal ${cogsJournal.id}`);
 
             return {
                 success: true,
@@ -1068,8 +1062,6 @@ export async function processInventoryAdjustment({
             where: { id: movement.id },
             data: { journalId: journal.id }
         });
-
-        console.log(`[InventoryAccounting] Adjustment ${journal.reference}: ${isPositive ? '+' : '-'}${Math.abs(adjustmentQty)} @ ${currentWAC} = ${adjustmentValue}`);
 
         return {
             success: true,

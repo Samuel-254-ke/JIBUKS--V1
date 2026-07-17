@@ -367,8 +367,6 @@ router.post('/', async (req, res) => {
                 },
             });
 
-            console.log(`[Transactions] Created loan disbursement ${transaction.id} with journal ${journalRef.id}`);
-
             return res.status(201).json({
                 ...transaction,
                 amount: Number(transaction.amount),
@@ -476,8 +474,6 @@ router.post('/', async (req, res) => {
                 },
             });
 
-            console.log(`[Transactions] Created transfer ${transaction.id} with journal ${journalRef.id}`);
-
             return res.status(201).json({
                 ...transaction,
                 amount: Number(transaction.amount),
@@ -540,7 +536,6 @@ router.post('/', async (req, res) => {
                 });
                 if (unclearedAccount) {
                     resolvedCreditAccountId = unclearedAccount.id;
-                    console.log(`[Transactions] Intercepted CHEQUE payment (Split). Swapped Bank Account via ID ${creditId} for Uncleared Cheques (ID: ${unclearedAccount.id})`);
                 }
             }
 
@@ -729,7 +724,6 @@ router.post('/', async (req, res) => {
                     if (unclearedAccount) {
                         // Overwrite credit account to utilize the liability account
                         resolvedCreditAccountId = unclearedAccount.id;
-                        console.log(`[Transactions] Intercepted CHEQUE payment. Swapped Bank Account for Uncleared Cheques (ID: ${unclearedAccount.id})`);
                     }
                 }
             } else {
@@ -898,15 +892,12 @@ router.post('/', async (req, res) => {
                             accountId: transaction.debitAccountId || resolvedDebitAccountId // The expense account
                         }
                     });
-                    console.log(`[Transactions] Synced with Expense module for Vendor ${resolvedVendorId}`);
                 } catch (expErr) {
                     console.error('[Transactions] Failed to sync with Expense module:', expErr);
                     // Don't fail the whole transaction if this secondary sync fails
                 }
             }
         }
-
-        console.log(`[Transactions] Created transaction ${transaction.id} with journal ${journalRef.id}`);
 
         res.status(201).json({
             ...transaction,

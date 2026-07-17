@@ -80,26 +80,12 @@ router.get('/profit-loss', async (req, res) => {
         }
 
         const { startDate, endDate } = parseDateRange(req.query);
-        console.log(`[P&L] Request Details:`, {
-            tenantId,
-            query: req.query,
-            parsedStart: startDate,
-            parsedEnd: endDate,
-            validDates: !isNaN(startDate) && !isNaN(endDate)
-        });
 
         if (isNaN(startDate) || isNaN(endDate)) {
             return res.status(400).json({ error: 'Invalid date format provided' });
         }
 
         const profitLoss = await getProfitAndLoss(tenantId, startDate, endDate);
-        console.log(`[P&L] Report generated successfully:`, {
-            incomeLines: profitLoss.income?.lines?.length || 0,
-            expenseLines: profitLoss.expenses?.lines?.length || 0,
-            totalIncome: profitLoss.income?.total || 0,
-            totalExpenses: profitLoss.expenses?.total || 0,
-            netIncome: profitLoss.netIncome || 0
-        });
 
         res.json({
             report: 'Profit & Loss Statement',
