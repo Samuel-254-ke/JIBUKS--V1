@@ -66,7 +66,7 @@ function AppNavigator() {
       <Stack
         screenOptions={{
           animation: 'slide_from_right',
-          animationDuration: 500,
+          animationDuration: 501,
         }}
       >
         <Stack.Screen name="slideshow" options={{ headerShown: false }} />
